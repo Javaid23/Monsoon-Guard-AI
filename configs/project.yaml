@@ -1,0 +1,126 @@
+# MonsoonGuard AI - frozen project configuration.
+# All decisions here come from CLAUDE.md Section 3. Any change must be recorded
+# in docs/decisions.md with date and reason, BEFORE test results are viewed.
+
+project:
+  name: monsoonguard
+  model_version: monsoonguard_v0.1
+  seed: 20260101
+
+region:
+  id: pk_north_30_37_69_75
+  # Evaluation box (TIGGE 0.5 deg grid): 15 lats (37->30 N) x 13 lons (69->75 E) = 195 cells
+  north: 37.0
+  south: 30.0
+  west: 69.0
+  east: 75.0
+  # Slightly larger crop for IMERG so 0.5 deg cell averaging has full coverage
+  # (CLAUDE.md 5.1). Half a 0.5 deg cell = 0.25 deg on each side.
+  crop:
+    north: 37.25
+    south: 29.75
+    west: 68.75
+    east: 75.25
+  grid_resolution_deg: 0.5
+  expected_shape: [15, 13]   # [lat, lon], latitudes descending 37 -> 30
+
+season:
+  months: [6, 7, 8, 9]       # JJAS
+  years: [2021, 2022, 2023, 2024, 2025]
+
+forecast:
+  source: TIGGE_NCEP
+  # ECDS (ECMWF Data Store) replaced the decommissioned apps.ecmwf.int Public
+  # Datasets service on 2026-05-27. The MARS-style keys in CLAUDE.md 5.2
+  # (class/expver/param/number/step/grid) no longer apply. See docs/decisions.md.
+  dataset: tigge-forecasts
+  origin: ncep                 # was the MARS centre code "kwbc"
+  issue_time_utc: "00:00"
+  steps_h: [24, 48, 72]
+  # Daily window totals from accumulated precipitation:
+  #   day 1 = step24, day 2 = step48 - step24, day 3 = step72 - step48
+  lead_days: [1, 2, 3]
+  data_format: grib
+  members:
+    perturbed: 30              # verify per year; record actual count in manifest
+    include_control: true
+  forecast_types:
+    perturbed: perturbed_forecast
+    control: control_forecast
+  # ECDS has no grid key: data arrives on the archive's native grid, which for
+  # NCEP TIGGE is 0.5 degrees. The loader must verify this per file.
+  expected_grid_deg: 0.5
+  params:
+    precipitation:
+      level_type: single_level
+      variables: [total_precipitation]
+    surface:
+      level_type: single_level
+      variables:
+        - total_column_water
+        - convective_available_potential_energy
+        - convective_inhibition
+        - mean_sea_level_pressure
+        - 10_m_u_component_of_wind
+        - 10_m_v_component_of_wind
+    pressure_level:
+      level_type: pressure
+      level_value: ["850"]
+      variables:
+        - u_component_of_wind
+        - v_component_of_wind
+        - specific_humidity
+
+observations:
+  product: GPM_3IMERGDF
+  version: "07"
+  run: Final
+  variable: precipitation
+  units: mm/day              # daily mean rate == daily total in mm
+  resolution_deg: 0.1
+  # Live ledger only - a faster, less accurate run. Treated as a separate dataset.
+  live_product: GPM_3IMERGDL
+  live_version: "07"
+
+mjo:
+  rmm_url: "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+  rmm_missing_sentinels: [1.0e36, 999.0]
+  omi_url: "https://psl.noaa.gov/mjo/mjoindex/omi.1x.txt"
+
+labels:
+  threshold_rule: p95_jjas_training_period_per_cell
+  threshold_percentile: 95
+  signal_fraction: 0.20      # signal=1 if >= 20% of perturbed members exceed threshold
+  sensitivity:
+    signal_fractions: [0.10, 0.20, 0.30, 0.50]
+    threshold_percentiles: [90, 95, 97.5]
+
+trust_bands:
+  rule_id: bands_v1
+  high_max: 0.20             # HIGH   if p_wrong <  0.20
+  medium_max: 0.50           # MEDIUM if 0.20 <= p_wrong < 0.50; LOW if >= 0.50
+
+split:
+  train_years: [2021, 2022, 2023]
+  calibration_years: [2024]
+  test_years: [2025]
+  case_study:
+    name: leave_2022_out
+    test_years: [2022]
+
+paths:
+  raw_tigge: data/raw/tigge_ncep
+  raw_imerg: data/raw/imerg_final
+  raw_mjo: data/raw/mjo
+  interim: data/interim
+  processed: data/processed
+  manifests: data/manifests
+  logs: logs
+  records: records
+  figures: reports/figures
+
+download:
+  # Global IMERG daily granules are ~34 MB each. Download a month, crop, delete.
+  imerg_temp_dir: tmp_imerg
+  imerg_max_workers: 4
+  tigge_chunk: month         # one request per month per parameter group

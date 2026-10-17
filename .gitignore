@@ -1,0 +1,33 @@
+# Data (never committed; rebuildable from manifests + scripts)
+data/
+!data/manifests/
+!data/manifests/*.json
+
+# Secrets
+.env
+.ecmwfapirc
+.netrc
+
+# Environment
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+
+# Logs and scratch
+logs/
+tmp_*/
+*.tmp
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Notebooks
+.ipynb_checkpoints/
+
+# cfgrib index caches (should not appear: indexpath is disabled)
+*.idx
