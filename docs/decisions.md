@@ -399,3 +399,71 @@ archive is present.
 
 **These are not results.** Both months fall inside the training years and the
 sample is 2 of 20 months.
+
+---
+
+## 2026-10-18 — Provisional baseline run while the archive downloads
+
+**Decision.** Rather than wait for the full 40-request TIGGE archive (queue
+position climbing, ~days not hours), `src/core/features.py`,
+`src/core/models.py` and `scripts/provisional_baseline.py` were built and run
+against whatever training-year months are already on disk. This validates the
+full pipeline end to end and gives honest provisional numbers; it is
+explicitly **not** the CLAUDE.md section 8 evaluation, which needs the
+calibration year (2024) and test year (2025).
+
+The script refuses to run if any calibration or test year data is present, so
+it cannot be mistaken for, or accidentally produce, the frozen evaluation.
+
+**Method.** Leave-one-month-out cross-validation across the training-year
+months present (9 months: all of 2021 and 2022 JJAS, plus 2023-06). For each
+held-out month, the model trains on the other months and predicts on the
+held-out one; metrics are pooled across all held-out folds rather than
+averaged per fold, since a single month's held-out sample is often too small
+or too imbalanced for a stable per-fold AUC.
+
+**Result, 2026-10-18, 159,120 samples (9 months x 3 lead days x 195 cells,
+minus rows with no verifying IMERG observation at month boundaries):**
+
+| Target | Model | Brier | Brier skill | ROC AUC | PR AUC |
+|---|---|---|---|---|---|
+| false_alarm (n=21,360, 76.5% positive) | reference | 0.1884 | 0.000 | 0.289 | 0.672 |
+| | raw signal fraction | 0.3630 | -0.927 | 0.617 | 0.824 |
+| | logistic regression | 0.2001 | -0.062 | **0.763** | 0.900 |
+| miss (n=137,760, 2.84% positive) | reference | 0.0277 | 0.000 | 0.313 | 0.020 |
+| | raw signal fraction | 0.0430 | -0.553 | 0.661 | 0.065 |
+| | logistic regression | 0.1740 | -5.280 | **0.794** | 0.118 |
+
+**Reading these numbers.** Logistic regression discriminates clearly above
+chance on both targets (ROC AUC 0.76 and 0.79), which is the first real
+evidence that ensemble spread and the other section 7.2 features carry signal
+about when a forecast decision will be wrong - the project's actual research
+question. Its Brier scores are currently *worse* than the reference baseline
+on both targets; this is expected and not a concern at this stage. The model
+is fit with `class_weight="balanced"` (reasonable given the class imbalance,
+especially 2.84% positive in the miss subset), which improves ranking at the
+direct expense of calibration. CLAUDE.md section 7.3 places calibration (fit
+on the calibration year only) as its own later pipeline stage for exactly this
+reason; comparing uncalibrated Brier scores against the reference is not yet
+meaningful and the test suite (`test_models.py`) checks discrimination here,
+not Brier, for the same reason.
+
+The false alarm rate (76.5% of signal=1 samples) is notably higher here than
+in the 2-month spot check run earlier (64.0%, logged above). The miss rate
+(2.84%) is lower than that same spot check (4.02%). Both numbers will keep
+moving as more months arrive; neither is stable yet at 9 of 20 months.
+
+**A build detail worth recording.** The feature table (160,290 rows) and label
+table (159,120 rows) differ by 1,170 rows: the feature table includes every
+(issue_date, lead_day, cell) combination regardless of whether a verifying
+observation exists, while the label table drops combinations whose verifying
+date falls outside the downloaded IMERG range (lead day 2 or 3 from a 30
+September issue date lands in October, which is outside JJAS and not
+downloaded). The inner join in `provisional_baseline.py` reconciles this
+correctly; it is not a bug, but worth knowing before extending either table.
+
+**What happens next.** Re-running `scripts/provisional_baseline.py` after more
+training months land will use the larger set automatically; nothing is
+hard-coded to 9 months. Once 2024 data exists, this script must stop being
+used (and will refuse to run) in favour of the real train/calibrate/test
+protocol.
