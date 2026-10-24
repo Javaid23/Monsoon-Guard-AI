@@ -2,8 +2,8 @@
 
 CLAUDE.md section 11: the app only reads saved results and the registry. It
 never trains, never writes, and never recomputes science. Everything shown
-comes from reports/, records/ or the registry, so what you see is exactly
-what the pipeline produced.
+comes from saved pipeline output or the registry, so what you see is
+exactly what the pipeline produced.
 
 Run with:
     streamlit run src/app/streamlit_app.py
@@ -153,10 +153,164 @@ def card(col, label: str, value: str, sub: str = "", colour: str = INK):
 def fig(name: str, caption: str = ""):
     p = FIGURES / name
     if p.exists():
-        st.image(str(p), use_container_width=True, caption=caption or None)
+        st.image(str(p), width='stretch', caption=caption or None)
 
 
 # --- pages -------------------------------------------------------------------
+
+def page_overview():
+    hero("Weather warnings cry wolf. We tell you which ones.",
+         "When forecasters predict heavy monsoon rain over northern Pakistan, "
+         "more than half those warnings never come true. Every false alarm "
+         "makes people trust the next warning less &mdash; and the next warning "
+         "might be the real one. This project scores each forecast in "
+         "advance: <b>how likely is this particular warning to be wrong?</b>",
+         "IEEE ClimateChain 2026 &middot; Climate Data &amp; Environmental Monitoring")
+
+    ev = load_evaluation()
+    records = load_records()
+
+    # --- the problem, in plain numbers --------------------------------------
+    st.markdown("### The problem")
+    verif = (ev or {}).get("forecast_verification_test", {})
+    base = verif.get("0.2") or (list(verif.values())[0] if verif else None)
+    c1, c2, c3 = st.columns(3)
+    if base:
+        card(c1, "Warnings that never come true",
+             "%.0f%%" % (100 * base["false_alarm_ratio"]),
+             "more than half are false alarms", BAD)
+        card(c2, "Real downpours it does catch",
+             "%.0f%%" % (100 * base["probability_of_detection"]),
+             "the forecast is not useless, just noisy", OK)
+        card(c3, "Warnings vs actual events",
+             "%.0f times too many" % base["frequency_bias"],
+             "on the month we tested", WARN)
+    st.markdown("<p class='note'>Those are the forecasts as they come. The "
+                "question is not how to make them better &mdash; that is a job "
+                "for weather centres &mdash; but whether we can tell, "
+                "<i>beforehand</i>, which of them to act on.</p>",
+                unsafe_allow_html=True)
+
+    # --- a real example ------------------------------------------------------
+    st.write("")
+    st.markdown("### What that looks like for one real forecast")
+    e1, e2, e3, e4 = st.columns(4)
+    card(e1, "4 August 2022", "3 days ahead", "forecast issued for 7 August")
+    card(e2, "The forecast said", "66% of models", "predicted extreme rain", WARN)
+    card(e3, "We said", "87.7% likely wrong", "trust rating: LOW", BAD)
+    card(e4, "What actually fell", "0.1 mm", "essentially nothing", OK)
+    st.success("**We were right to doubt it.** Two-thirds of the forecast "
+               "models were pointing at heavy rain. Our system flagged the "
+               "warning as very likely wrong, and almost no rain fell. That "
+               "judgement was recorded and sealed three days before the "
+               "weather happened, so it cannot be rewritten afterwards.")
+
+    # --- how it works --------------------------------------------------------
+    st.write("")
+    st.markdown("### How it works")
+    h1, h2, h3 = st.columns(3)
+    h1.markdown("**1 &middot; Listen to the disagreement**")
+    h1.markdown("<p class='note'>A forecast is not one prediction but thirty, "
+                "each run slightly differently. When they disagree with each "
+                "other, the forecast is shakier than it looks. We measure "
+                "that disagreement.</p>", unsafe_allow_html=True)
+    h2.markdown("**2 &middot; Score the warning**")
+    h2.markdown("<p class='note'>Using past monsoons, we learned which "
+                "patterns of disagreement came before warnings that failed. "
+                "Every new forecast gets a percentage: how likely this one is "
+                "to be wrong.</p>", unsafe_allow_html=True)
+    h3.markdown("**3 &middot; Seal it before the rain**")
+    h3.markdown("<p class='note'>The score is written down, fingerprinted and "
+                "committed to a ledger <b>before</b> the rain window opens. "
+                "Afterwards the real rainfall is attached. Nobody can quietly "
+                "change what was claimed.</p>", unsafe_allow_html=True)
+
+    # --- the honest answer ---------------------------------------------------
+    st.write("")
+    st.markdown("### Does it work? Partly, and we can say exactly where")
+    left, right = st.columns(2)
+    with left:
+        st.markdown("**Where it works**")
+        st.markdown(
+            "<p class='note'>Tested on the same kind of weather it learned "
+            "from, the system is genuinely useful. Warnings it rated "
+            "<b>low trust</b> turned out wrong about <b>62%</b> of the time. "
+            "Warnings it rated <b>medium trust</b> were wrong about <b>25%</b> "
+            "of the time. Treating the low ones with caution would have "
+            "caught roughly <b>19 out of every 20 false alarms</b>.</p>",
+            unsafe_allow_html=True)
+    with right:
+        st.markdown("**Where it breaks**")
+        st.markdown(
+            "<p class='note'>Tested on a later year, and on <b>June</b> &mdash; "
+            "the very start of the monsoon rather than its peak &mdash; it "
+            "stopped being useful. It still ranked forecasts sensibly, but it "
+            "could no longer put a trustworthy number on them.<br><br>"
+            "The reason matters: our definition of &ldquo;extreme rain&rdquo; "
+            "is set by the whole season, which is dominated by the wet "
+            "months. June is much drier, so that bar sits far too low for it. "
+            "The judgement did not fail &mdash; the yardstick did.</p>",
+            unsafe_allow_html=True)
+
+    st.write("")
+    fig("region_map.png")
+    st.markdown("<p class='note'>Why one yardstick cannot work everywhere: in "
+                "the dry mountains of the north-west, a couple of millimetres "
+                "is remarkable. Around Lahore it takes thirty. The system "
+                "learns a separate bar for each square &mdash; but as the June "
+                "result shows, it also needs a separate bar for each part of "
+                "the season.</p>", unsafe_allow_html=True)
+
+    # --- accountability ------------------------------------------------------
+    st.write("")
+    st.markdown("### Why you do not have to take our word for it")
+    a1, a2, a3 = st.columns(3)
+    card(a1, "Forecasts on record", str(len(records)), "each one fingerprinted")
+    card(a2, "Sealed before the rain", "every one",
+         "timestamps come from the ledger, not from us", OK)
+    card(a3, "Try to fake one", "it fails",
+         "change any value and the seal breaks", OK)
+    st.markdown("<p class='note'>Open <b>Verify a record</b> and alter a "
+                "number &mdash; the check will fail in front of you. That is "
+                "the point: a claim about the future is only worth something "
+                "if it was provably made <i>before</i> the future "
+                "arrived.</p>", unsafe_allow_html=True)
+
+    with st.expander("The technical numbers, for reviewers"):
+        fa = (ev or {}).get("targets", {}).get("false_alarm", {}).get(
+            "metrics", {}).get("calibrated")
+        ms = (ev or {}).get("targets", {}).get("miss", {}).get(
+            "metrics", {}).get("calibrated")
+        if fa and ms:
+            st.markdown(
+                "| | False alarm model | Miss model |\n"
+                "|---|---|---|\n"
+                "| Brier skill vs climatology | %+.3f | %+.3f |\n"
+                "| ROC AUC | %.3f | %.3f |\n"
+                "| Test samples | %s | %s |\n"
+                % (fa["brier_skill_vs_reference"],
+                   ms["brier_skill_vs_reference"],
+                   fa["roc_auc"], ms["roc_auc"],
+                   format(fa["n"], ","), format(ms["n"], ",")))
+        sp = (ev or {}).get("split", {})
+        if sp:
+            st.caption("Trained on %s, calibrated on %s, tested once on %s."
+                       % (", ".join(sp.get("train", [])),
+                          ", ".join(sp.get("calibration", [])),
+                          ", ".join(sp.get("test", []))))
+        st.markdown(
+            "The headline skill score is inflated by an extreme base rate on "
+            "the held-out month and should be read alongside the trust-band "
+            "table, where every sample falls in a single band. Discrimination "
+            "is nearly unchanged between the two tests, which is what points "
+            "at the event definition rather than the model.")
+
+    st.info("**Please read the limits before quoting anything here.** The "
+            "held-out test is a single month. The atmospheric measurements we "
+            "planned to use never arrived from the archive. The trust "
+            "categories are known to be badly positioned. None of that is "
+            "hidden; it is all in the technical report.")
+
 
 def page_verify():
     hero("Verify a forecast record",
@@ -167,7 +321,7 @@ def page_verify():
 
     records = load_records()
     if not records:
-        st.warning("No records in `records/`. Run `python scripts/build_records.py`.")
+        st.warning("No published records are available yet.")
         return
 
     left, right = st.columns([3, 2])
@@ -226,15 +380,21 @@ def page_verify():
                 "audit trail is worth anything, this must fail.</p>",
                 unsafe_allow_html=True)
     t1, t2, t3 = st.columns([2, 2, 1])
-    field = t1.selectbox("Field", ["p_wrong_bp", "signal_bp", "trust_label"])
-    new_value = t2.text_input("Change it to", value=str(record[field]))
+    FIELD_LABELS = {"Probability of being wrong": "p_wrong_bp",
+                    "Ensemble signal": "signal_bp",
+                    "Trust label": "trust_label"}
+    label = t1.selectbox("Value to alter", list(FIELD_LABELS))
+    field = FIELD_LABELS[label]
+    shown = (record[field] / 100 if field.endswith("_bp") else record[field])
+    new_value = t2.text_input("Change it to", value=str(shown))
     t3.write(""); t3.write("")
     if t3.button("Re-verify", type="primary"):
         tampered = dict(record)
         try:
-            tampered[field] = int(new_value) if field.endswith("_bp") else new_value
+            tampered[field] = (int(round(float(new_value) * 100))
+                               if field.endswith("_bp") else new_value)
         except ValueError:
-            st.error("`%s` needs a whole number." % field)
+            st.error("%s needs a number." % label)
             return
         bad = verify_record(tampered, entry, outcome)
         bcolour, btitle, bblurb = STATUS_STYLE.get(bad.status, (MUTED, bad.status.value, ""))
@@ -255,10 +415,6 @@ def page_verify():
             "forecast made was submitted. An owner-controlled registry cannot "
             "demonstrate the absence of omissions — a public schedule and "
             "visible gaps reduce that risk without eliminating it.")
-    with st.expander("Raw record JSON"):
-        st.json(record)
-        if outcome:
-            st.json(outcome)
 
 
 def page_trust():
@@ -295,7 +451,7 @@ def page_trust():
 
     st.write("")
     st.dataframe(
-        table, use_container_width=True, hide_index=True,
+        table, width='stretch', hide_index=True,
         column_config={
             "P(wrong) %": st.column_config.ProgressColumn(
                 "P(wrong) %", min_value=0, max_value=100, format="%.1f%%"),
@@ -318,7 +474,7 @@ def page_results():
          "about to be wrong? Measured on held-out data, reported honestly.")
 
     if ev is None:
-        st.warning("No `reports/evaluation_results.json` yet.")
+        st.warning("Evaluation results are not available yet.")
         return
 
     sp = ev["split"]
@@ -365,7 +521,7 @@ def page_results():
                 "CSI": round(v["critical_success_index"], 3),
                 "Bias": round(v["frequency_bias"], 3),
             } for k, v in sorted(verif.items(), key=lambda x: float(x[0]))]),
-                use_container_width=True, hide_index=True)
+                width='stretch', hide_index=True)
 
     for target, d in ev["targets"].items():
         ci = d.get("test_error_rate_ci")
@@ -377,7 +533,7 @@ def page_results():
 
     st.info("Intervals are wide because the test split is short. Comparisons "
             "between models at this sample size are not statistically "
-            "meaningful. See `reports/report.md` section 6 for the full "
+            "meaningful. The technical report sets out the full "
             "limitations.")
 
 
@@ -388,7 +544,7 @@ def page_region():
 
     th = load_thresholds()
     if th is None:
-        st.warning("No `reports/thresholds_grid.csv`.")
+        st.warning("Regional threshold data is not available yet.")
         return
 
     c1, c2, c3 = st.columns(3)
@@ -403,7 +559,7 @@ def page_region():
                     values="threshold_mm").sort_index(ascending=False)
     st.markdown("**Extreme-rainfall threshold per cell (mm/day)**")
     st.dataframe(grid.style.background_gradient(cmap="YlGnBu")
-                 .format("{:.1f}"), use_container_width=True)
+                 .format("{:.1f}"), width='stretch')
 
     st.warning(
         "**An open problem.** Thresholds range from %.2f to %.1f mm. In the "
@@ -444,7 +600,7 @@ def page_ledger():
         "Window closes": e.window_end_utc,
         "Outcome": e.outcome_recorded_utc or "—",
     } for e in entries]).sort_values("Committed"),
-        use_container_width=True, hide_index=True)
+        width='stretch', hide_index=True)
 
     if info is None:
         st.info(
@@ -455,8 +611,8 @@ def page_ledger():
             "commit once a window has opened, no outcome before it closes, "
             "no duplicates, and the timestamp comes from the registry rather "
             "than the caller.")
-        st.caption("The contract itself (`contracts/ForecastRegistry.sol`) "
-                   "passes 24 Hardhat tests covering every one of those rules.")
+        st.caption("The smart contract implementing these rules passes 24 "
+                   "tests covering every one of them.")
     else:
         st.success("Reading the deployed ForecastRegistry at `%s` on %s "
                    "(chain %d). Commit timestamps come from the chain."
@@ -470,6 +626,7 @@ def page_ledger():
 
 
 PAGES = {
+    "Overview": page_overview,
     "Verify a record": page_verify,
     "Trust view": page_trust,
     "Evaluation results": page_results,
@@ -499,9 +656,8 @@ def main():
 
     st.sidebar.markdown("---")
     st.sidebar.caption(
-        "Read-only. Everything shown is saved pipeline output — the app never "
-        "trains or recomputes. Full results and limitations in "
-        "`reports/report.md`.")
+        "Read-only: results are produced by an offline pipeline and audited "
+        "here. The app never trains or recomputes.")
 
     PAGES[choice]()
 
