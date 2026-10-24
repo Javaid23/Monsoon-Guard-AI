@@ -66,14 +66,21 @@ def _validate(cfg: Config) -> None:
         f"{region['expected_shape']}"
     )
 
-    # Splits must not overlap (CLAUDE.md section 8.1).
+    # Splits must not overlap, and must stay chronological (CLAUDE.md 8.1).
     split = cfg["split"]
-    train = set(split["train_years"])
-    cal = set(split["calibration_years"])
-    test = set(split["test_years"])
-    assert not (train & cal), "train and calibration years overlap"
-    assert not (train & test), "train and test years overlap"
-    assert not (cal & test), "calibration and test years overlap"
+    train = set(split["train_months"])
+    cal = set(split["calibration_months"])
+    test = set(split["test_months"])
+    assert train, "train_months is empty"
+    assert cal, "calibration_months is empty"
+    assert test, "test_months is empty"
+    assert not (train & cal), "train and calibration months overlap"
+    assert not (train & test), "train and test months overlap"
+    assert not (cal & test), "calibration and test months overlap"
+    # Never train on the future: every train month precedes every calibration
+    # month, which precedes every test month.
+    assert max(train) < min(cal), "train months must precede calibration months"
+    assert max(cal) < min(test), "calibration months must precede test months"
 
     bands = cfg["trust_bands"]
     assert 0 < bands["high_max"] < bands["medium_max"] < 1, "trust bands misordered"
@@ -130,6 +137,20 @@ def expected_season_days(cfg: Config, years: list[int] | None = None) -> int:
     return sum(m.n_days for m in season_months(cfg, years))
 
 
+# --- Splits -----------------------------------------------------------------
+
+def split_months(cfg: Config, which: str) -> list[str]:
+    """Months for 'train', 'calibration' or 'test', as 'YYYY-MM' strings."""
+    key = {"train": "train_months", "calibration": "calibration_months",
+           "test": "test_months"}[which]
+    return list(cfg["split"][key])
+
+
+def split_years(cfg: Config, which: str) -> list[int]:
+    """Distinct years covered by a split."""
+    return sorted({int(m[:4]) for m in split_months(cfg, which)})
+
+
 # --- Credentials ------------------------------------------------------------
 
 def load_dotenv_if_present() -> None:
@@ -181,4 +202,4 @@ if __name__ == "__main__":
     print(f"months:   {len(months)} ({months[0]} .. {months[-1]})")
     print(f"days:     {expected_season_days(cfg)} JJAS days total")
     for name in ("train", "calibration", "test"):
-        print(f"{name:12s}: {cfg['split'][name + '_years']}")
+        print(f"{name:12s}: {split_months(cfg, name)}")

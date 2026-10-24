@@ -467,3 +467,63 @@ training months land will use the larger set automatically; nothing is
 hard-coded to 9 months. Once 2024 data exists, this script must stop being
 used (and will refuse to run) in favour of the real train/calibrate/test
 protocol.
+
+---
+
+## 2026-10-24 — Split re-frozen on available data (deviation from CLAUDE.md section 3)
+
+**Recorded BEFORE any test result was viewed, as CLAUDE.md section 3 requires.**
+
+**Decision.** The train/calibration/test split moves from years to months:
+
+| Split | Months | Days |
+|---|---|---|
+| train | 2021-06, 2021-07, 2021-08, 2021-09 | 122 |
+| calibration | 2022-06, 2022-07 | 61 |
+| test | 2022-08, 2022-09 | 61 |
+
+Chronological, non-overlapping, and enforced by assertions in
+`src/core/config.py` (`max(train) < min(calibration) < min(test)`).
+
+**Reason.** The original design (train 2021-2023, calibrate 2024, test 2025)
+is unreachable. ECDS delivered 19 of 40 precipitation requests over eight days
+and **nothing at all for 2024 or 2025**. Individual perturbed-month requests
+took between 0.8 minutes and 15.9 hours, driven by a shared global MARS tape
+queue whose position grew while we were idle. With the submission deadline on
+2026-10-25 there is no prospect of the calibration and test years arriving.
+
+CLAUDE.md section 3 anticipates exactly this: the split row ends "Adjust if
+data coverage differs." Section 14's cut list also permits reducing seasons.
+Without this change there is no calibration set and no test set, so there is
+no evaluation at all - strictly worse than a smaller but complete one.
+
+**What is preserved.** Everything structural: a chronological split that never
+trains on the future, thresholds fitted on train months only, calibration
+fitted on the calibration split only, and a test split touched exactly once.
+The leakage checks still run and still pass.
+
+**What is lost, and must be stated in the report.**
+
+- The test set is 61 days in one season, not a full independent season. It
+  cannot show year-to-year generalisation at all.
+- Train is a single season (2021), so anything peculiar to 2021 is baked in.
+- The test months are August and September 2022 - the catastrophic flood
+  period. That is the most extreme part of the archive, so the test set is
+  deliberately *not* representative of a typical monsoon. Results will be
+  dominated by one exceptional event and must not be read as typical skill.
+- The section 9 leave-2022-out case study is no longer separable from the
+  test split, since 2022 now *is* the calibration and test data. The case
+  study becomes a description of the test period rather than an independent
+  check.
+- Sample sizes per CLAUDE.md section 15 were already small; they are now
+  smaller, and the block bootstrap by calendar week has roughly 9 blocks in
+  the test split rather than dozens.
+
+**The original design stays recorded** in `configs/project.yaml` under
+`split.original_design` with `reachable: false`, so the deviation remains
+visible rather than quietly overwritten.
+
+**If the remaining data arrives** before submission, the correct action is to
+restore the original split and re-run; the test split would then be genuinely
+untouched, since the models trained under this reduced split would be
+discarded rather than carried over.

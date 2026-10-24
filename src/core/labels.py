@@ -25,7 +25,7 @@ import pandas as pd
 import xarray as xr
 
 from .align import Window
-from .config import Config, load_config
+from .config import Config, load_config, split_months
 
 
 @dataclass
@@ -51,19 +51,20 @@ class Thresholds:
 
 def compute_thresholds(obs: xr.DataArray, cfg: Config | None = None,
                        years: list[int] | None = None,
+                       months: list[str] | None = None,
                        percentile: float | None = None) -> Thresholds:
-    """Per-cell percentile of daily rainfall, from the training years only.
+    """Per-cell percentile of daily rainfall, from the TRAIN split only.
 
     `obs` must already be on the forecast grid, with dims
     (time, latitude, longitude).
 
-    `years` defaults to the configured training years. Passing anything else
-    is allowed only for the leave-one-season-out case study, and the years
-    actually used are recorded on the result so a later check can prove no
-    calibration or test year contributed.
+    By default the threshold uses exactly the configured `train_months`.
+    `months` (a list of "YYYY-MM") or `years` may override that, but only for
+    sensitivity runs and the case study; whatever was actually used is
+    recorded on the result so a later check can prove no calibration or test
+    month contributed.
     """
     cfg = cfg or load_config()
-    years = list(years) if years is not None else list(cfg["split"]["train_years"])
     percentile = (percentile if percentile is not None
                   else float(cfg["labels"]["threshold_percentile"]))
 
@@ -72,11 +73,22 @@ def compute_thresholds(obs: xr.DataArray, cfg: Config | None = None,
             "thresholds must be computed on the forecast grid (latitude, "
             "longitude); got dims %s" % (obs.dims,))
 
-    months = list(cfg["season"]["months"])
     time_index = pd.to_datetime(obs["time"].values)
-    mask = np.isin(time_index.year, years) & np.isin(time_index.month, months)
+    stamps = time_index.strftime("%Y-%m")
+
+    if months is None and years is None:
+        months = split_months(cfg, "train")
+
+    if months is not None:
+        mask = np.isin(stamps, list(months))
+        label = "months %s" % (list(months),)
+    else:
+        season = list(cfg["season"]["months"])
+        mask = np.isin(time_index.year, years) & np.isin(time_index.month, season)
+        label = "years %s" % (list(years),)
+
     if not mask.any():
-        raise ValueError("no observations in years %s, months %s" % (years, months))
+        raise ValueError("no observations in " + label)
 
     subset = obs.isel(time=np.flatnonzero(mask))
     values = subset.quantile(percentile / 100.0, dim="time").drop_vars(
@@ -88,7 +100,7 @@ def compute_thresholds(obs: xr.DataArray, cfg: Config | None = None,
         percentile=percentile,
         years_used=sorted({int(y) for y in time_index.year[mask]}),
         n_days_used=int(mask.sum()),
-        months_used=months,
+        months_used=sorted(set(stamps[mask])),
     )
 
 

@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.core.config import (  # noqa: E402
     SeasonMonth,
+    split_months,
     crop_bbox_wsen,
     expected_season_days,
     load_config,
@@ -67,25 +68,39 @@ def test_bbox_orderings_are_not_mixed_up(cfg):
 
 
 def test_splits_do_not_overlap(cfg):
-    train = set(cfg["split"]["train_years"])
-    cal = set(cfg["split"]["calibration_years"])
-    test = set(cfg["split"]["test_years"])
+    train = set(split_months(cfg, "train"))
+    cal = set(split_months(cfg, "calibration"))
+    test = set(split_months(cfg, "test"))
     assert not train & cal
     assert not train & test
     assert not cal & test
 
 
-def test_test_year_is_last(cfg):
-    """The chronological split must not train on the future."""
-    assert max(cfg["split"]["train_years"]) < min(cfg["split"]["calibration_years"])
-    assert max(cfg["split"]["calibration_years"]) < min(cfg["split"]["test_years"])
+def test_split_is_chronological(cfg):
+    """The split must not train on the future (CLAUDE.md section 8.1)."""
+    train = split_months(cfg, "train")
+    cal = split_months(cfg, "calibration")
+    test = split_months(cfg, "test")
+    assert max(train) < min(cal)
+    assert max(cal) < min(test)
 
 
-def test_every_season_year_is_assigned_to_a_split(cfg):
-    assigned = (set(cfg["split"]["train_years"])
-                | set(cfg["split"]["calibration_years"])
-                | set(cfg["split"]["test_years"]))
-    assert assigned == set(cfg["season"]["years"])
+def test_split_months_are_all_in_season(cfg):
+    """Every split month must be a JJAS month the project actually covers."""
+    season = set(cfg["season"]["months"])
+    for which in ("train", "calibration", "test"):
+        for m in split_months(cfg, which):
+            assert int(m[5:7]) in season, m
+            assert int(m[:4]) in set(cfg["season"]["years"]), m
+
+
+def test_original_design_is_recorded_as_unreachable(cfg):
+    """The CLAUDE.md section 3 split is kept on record, marked unreachable,
+    so the deviation stays visible rather than silently overwritten."""
+    orig = cfg["split"]["original_design"]
+    assert orig["calibration_years"] == [2024]
+    assert orig["test_years"] == [2025]
+    assert orig["reachable"] is False
 
 
 def test_trust_bands_ordered(cfg):

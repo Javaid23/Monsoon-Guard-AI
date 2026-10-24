@@ -65,13 +65,14 @@ def _forecast(issue_dates, n_members=30, seed=1, scale=1.0):
 
 # --- thresholds -------------------------------------------------------------
 
-def test_thresholds_use_only_training_years(cfg):
-    """The calibration and test years must not influence the threshold."""
-    obs = _obs([2021, 2022, 2023, 2024, 2025])
+def test_thresholds_use_only_training_months(cfg):
+    """Calibration and test months must not influence the threshold."""
+    from src.core.config import split_months
+    obs = _obs([2021, 2022, 2023])
     th = compute_thresholds(obs, cfg)
-    assert th.years_used == [2021, 2022, 2023]
-    assert 2024 not in th.years_used
-    assert 2025 not in th.years_used
+    assert th.months_used == sorted(split_months(cfg, "train"))
+    for m in split_months(cfg, "calibration") + split_months(cfg, "test"):
+        assert m not in th.months_used
 
 
 def test_threshold_is_unchanged_by_altering_test_years(cfg):
@@ -89,10 +90,11 @@ def test_threshold_is_unchanged_by_altering_test_years(cfg):
 
 
 def test_threshold_day_count_matches_the_training_calendar(cfg):
-    obs = _obs([2021, 2022, 2023, 2024, 2025])
+    """The active train split is 2021 JJAS: 30+31+31+30 = 122 days."""
+    obs = _obs([2021, 2022, 2023])
     th = compute_thresholds(obs, cfg)
-    assert th.n_days_used == 122 * 3          # three JJAS seasons
-    assert th.months_used == [6, 7, 8, 9]
+    assert th.n_days_used == 122
+    assert th.years_used == [2021]
 
 
 def test_threshold_is_the_requested_percentile(cfg):

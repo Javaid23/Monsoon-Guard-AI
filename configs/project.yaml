@@ -101,12 +101,25 @@ trust_bands:
   medium_max: 0.50           # MEDIUM if 0.20 <= p_wrong < 0.50; LOW if >= 0.50
 
 split:
-  train_years: [2021, 2022, 2023]
-  calibration_years: [2024]
-  test_years: [2025]
+  # ORIGINAL DESIGN (CLAUDE.md section 3): train 2021-2023, calibrate 2024,
+  # test 2025. Unreachable: ECDS never delivered 2024 or 2025 before the
+  # submission deadline. CLAUDE.md section 3 permits "Adjust if data coverage
+  # differs". Re-frozen 2026-10-24 BEFORE any test result was viewed.
+  # See docs/decisions.md for the full record.
+  original_design:
+    train_years: [2021, 2022, 2023]
+    calibration_years: [2024]
+    test_years: [2025]
+    reachable: false
+
+  # ACTIVE SPLIT - month level, chronological, no overlap.
+  train_months: ["2021-06", "2021-07", "2021-08", "2021-09"]
+  calibration_months: ["2022-06", "2022-07"]
+  test_months: ["2022-08", "2022-09"]
+
   case_study:
-    name: leave_2022_out
-    test_years: [2022]
+    name: flood_2022_august
+    months: ["2022-08"]
 
 paths:
   raw_tigge: data/raw/tigge_ncep
