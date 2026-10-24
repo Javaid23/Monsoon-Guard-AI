@@ -81,6 +81,62 @@ CSS = """
   .pill {display:inline-block; padding:.12rem .55rem; border-radius:999px;
          font-size:.76rem; font-weight:600; color:#fff;}
   .note {font-size:.87rem; color:#636c76; line-height:1.55;}
+  /* ---- sidebar ---- */
+  section[data-testid="stSidebar"] {
+    background: #0f2a22;
+    border-right: 1px solid #0a1f19;
+  }
+  section[data-testid="stSidebar"] * {color: #e8efec;}
+
+  .brand {padding: .35rem 0 1.1rem 0;}
+  .brand-name {
+    font-size: 1.22rem; font-weight: 700; letter-spacing: -0.01em;
+    color: #fff; line-height: 1.2;
+  }
+  .brand-sub {
+    font-size: .83rem; color: #9fc4b5 !important; margin-top: .3rem;
+    line-height: 1.45;
+  }
+
+  /* radio: turn the stock list into tappable rows */
+  section[data-testid="stSidebar"] div[role="radiogroup"] {gap: .18rem;}
+  section[data-testid="stSidebar"] div[role="radiogroup"] > label {
+    padding: .5rem .65rem; border-radius: 9px; margin: 0;
+    transition: background .12s ease;
+  }
+  section[data-testid="stSidebar"] div[role="radiogroup"] > label:hover {
+    background: rgba(255,255,255,.07);
+  }
+  section[data-testid="stSidebar"] div[role="radiogroup"] > label p {
+    font-size: .95rem !important; font-weight: 550;
+  }
+  section[data-testid="stSidebar"] div[role="radiogroup"] > label
+    div[data-testid="stCaptionContainer"] p {
+    font-size: .76rem !important; color: #8fb3a5 !important;
+    font-weight: 400; margin-top: .05rem;
+  }
+
+  .sb-rule {height:1px; background:rgba(255,255,255,.12); margin:1.1rem 0;}
+
+  .sb-stats {display:flex; flex-direction:column; gap:.5rem;}
+  .sb-stat {display:flex; justify-content:space-between; align-items:baseline;}
+  .sb-stat span {font-size:.8rem; color:#9fc4b5 !important;}
+  .sb-stat b {font-size:.95rem; color:#fff !important;}
+
+  .sb-reg {
+    margin-top:1rem; padding:.7rem .8rem; border-radius:9px;
+    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
+  }
+  .sb-reg-top {font-size:.88rem; font-weight:600; display:flex;
+               align-items:center; gap:.45rem;}
+  .sb-reg-sub {font-size:.76rem; color:#9fc4b5 !important; margin-top:.25rem;
+               line-height:1.4; word-break:break-all;}
+  .dot {width:8px; height:8px; border-radius:50%; display:inline-block;}
+
+  .sb-link {font-size:.8rem; color:#7ee2b8 !important; text-decoration:none;}
+  .sb-link:hover {text-decoration:underline;}
+
+  .sb-foot {font-size:.76rem; color:#8fb3a5 !important; line-height:1.5;}
 </style>
 """
 
@@ -159,124 +215,136 @@ def fig(name: str, caption: str = ""):
 # --- pages -------------------------------------------------------------------
 
 def page_overview():
-    hero("Weather warnings cry wolf. We tell you which ones.",
-         "When forecasters predict heavy monsoon rain over northern Pakistan, "
-         "more than half those warnings never come true. Every false alarm "
-         "makes people trust the next warning less &mdash; and the next warning "
-         "might be the real one. This project scores each forecast in "
-         "advance: <b>how likely is this particular warning to be wrong?</b>",
-         "IEEE ClimateChain 2026 &middot; Climate Data &amp; Environmental Monitoring")
-
     ev = load_evaluation()
     records = load_records()
-
-    # --- the problem, in plain numbers --------------------------------------
-    st.markdown("### The problem")
     verif = (ev or {}).get("forecast_verification_test", {})
     base = verif.get("0.2") or (list(verif.values())[0] if verif else None)
+
+    far = 100 * base["false_alarm_ratio"] if base else None
+    pod = 100 * base["probability_of_detection"] if base else None
+    bias = base["frequency_bias"] if base else None
+
+    hero("Which rain warnings should you believe?",
+         "Weather services warn when heavy rain is coming. Many of those "
+         "warnings do not happen. If people are warned again and again and "
+         "nothing comes, they stop listening &mdash; and one day the warning "
+         "is real. This project looks at each warning before the rain and "
+         "estimates <b>how likely it is to be wrong</b>.",
+         "IEEE ClimateChain 2026 &middot; Climate Data &amp; Environmental Monitoring")
+
+    # --- the problem ---------------------------------------------------------
+    st.markdown("### First, how good are the warnings we have?")
+    st.markdown("<p class='note'>We checked the forecasts for northern "
+                "Pakistan against what the rain satellites actually "
+                "recorded.</p>", unsafe_allow_html=True)
+
     c1, c2, c3 = st.columns(3)
     if base:
-        card(c1, "Warnings that never come true",
-             "%.0f%%" % (100 * base["false_alarm_ratio"]),
-             "more than half are false alarms", BAD)
-        card(c2, "Real downpours it does catch",
-             "%.0f%%" % (100 * base["probability_of_detection"]),
-             "the forecast is not useless, just noisy", OK)
-        card(c3, "Warnings vs actual events",
-             "%.0f times too many" % base["frequency_bias"],
-             "on the month we tested", WARN)
-    st.markdown("<p class='note'>Those are the forecasts as they come. The "
-                "question is not how to make them better &mdash; that is a job "
-                "for weather centres &mdash; but whether we can tell, "
-                "<i>beforehand</i>, which of them to act on.</p>",
-                unsafe_allow_html=True)
+        card(c1, "Warnings that did not happen", "%.0f out of 100" % far,
+             "the rain never arrived", BAD)
+        card(c2, "Heavy rain days it did warn about", "%.0f out of 100" % pod,
+             "these were caught correctly", WARN if pod < 50 else OK)
+        card(c3, "Warnings given for each real event", "%.0f" % bias,
+             "far more warnings than events", BAD)
+        st.markdown("<p class='note'>In the month we tested, the forecast "
+                    "gave about <b>%.0f warnings for every real heavy-rain "
+                    "day</b>. Most of those warnings were wrong. Our job is "
+                    "not to make the forecast better &mdash; that is for "
+                    "weather centres. Our job is to say, in advance, which "
+                    "warnings are worth acting on.</p>" % bias,
+                    unsafe_allow_html=True)
 
     # --- a real example ------------------------------------------------------
     st.write("")
-    st.markdown("### What that looks like for one real forecast")
+    st.markdown("### One real example")
+    st.markdown("<p class='note'>This is a real forecast from the 2022 "
+                "monsoon, with the numbers exactly as they were recorded at "
+                "the time.</p>", unsafe_allow_html=True)
+
     e1, e2, e3, e4 = st.columns(4)
-    card(e1, "4 August 2022", "3 days ahead", "forecast issued for 7 August")
-    card(e2, "The forecast said", "66% of models", "predicted extreme rain", WARN)
-    card(e3, "We said", "87.7% likely wrong", "trust rating: LOW", BAD)
-    card(e4, "What actually fell", "0.1 mm", "essentially nothing", OK)
-    st.success("**We were right to doubt it.** Two-thirds of the forecast "
-               "models were pointing at heavy rain. Our system flagged the "
-               "warning as very likely wrong, and almost no rain fell. That "
-               "judgement was recorded and sealed three days before the "
-               "weather happened, so it cannot be rewritten afterwards.")
+    card(e1, "The date", "4 August 2022", "looking 3 days ahead")
+    card(e2, "What the forecast said", "66 of 100", "computer runs predicted heavy rain", WARN)
+    card(e3, "What we said", "87 out of 100", "chance this warning is wrong", BAD)
+    card(e4, "What actually fell", "0.1 mm", "almost no rain at all", OK)
+    st.success("**Our warning about the warning was correct.** Most of the "
+               "computer runs pointed to heavy rain. We said the warning was "
+               "very likely wrong, and it was. We wrote that down and locked "
+               "it three days before the date, so it could not be changed "
+               "afterwards.")
 
     # --- how it works --------------------------------------------------------
     st.write("")
-    st.markdown("### How it works")
+    st.markdown("### How it works, in three steps")
     h1, h2, h3 = st.columns(3)
-    h1.markdown("**1 &middot; Listen to the disagreement**")
-    h1.markdown("<p class='note'>A forecast is not one prediction but thirty, "
-                "each run slightly differently. When they disagree with each "
-                "other, the forecast is shakier than it looks. We measure "
-                "that disagreement.</p>", unsafe_allow_html=True)
-    h2.markdown("**2 &middot; Score the warning**")
-    h2.markdown("<p class='note'>Using past monsoons, we learned which "
-                "patterns of disagreement came before warnings that failed. "
-                "Every new forecast gets a percentage: how likely this one is "
-                "to be wrong.</p>", unsafe_allow_html=True)
-    h3.markdown("**3 &middot; Seal it before the rain**")
-    h3.markdown("<p class='note'>The score is written down, fingerprinted and "
-                "committed to a ledger <b>before</b> the rain window opens. "
-                "Afterwards the real rainfall is attached. Nobody can quietly "
-                "change what was claimed.</p>", unsafe_allow_html=True)
+    h1.markdown("**Step 1 &mdash; Look for disagreement**")
+    h1.markdown("<p class='note'>A forecast is not one prediction. The "
+                "computer is run 30 times with slightly different starting "
+                "conditions. If the 30 runs agree, the forecast is firm. If "
+                "they disagree, it is shaky. We measure how much they "
+                "disagree.</p>", unsafe_allow_html=True)
+    h2.markdown("**Step 2 &mdash; Give the warning a score**")
+    h2.markdown("<p class='note'>We looked at past monsoons to learn which "
+                "kinds of disagreement came before warnings that turned out "
+                "wrong. Each new warning gets a score out of 100: how likely "
+                "it is to be wrong.</p>", unsafe_allow_html=True)
+    h3.markdown("**Step 3 &mdash; Lock it in before the rain**")
+    h3.markdown("<p class='note'>The score is saved and locked in a tamper-"
+                "proof record <b>before</b> the rain is due. After the date "
+                "passes, the real rainfall is added. Nobody can go back and "
+                "change what was said.</p>", unsafe_allow_html=True)
 
-    # --- the honest answer ---------------------------------------------------
+    # --- honest findings -----------------------------------------------------
     st.write("")
-    st.markdown("### Does it work? Partly, and we can say exactly where")
+    st.markdown("### Does it work?")
     left, right = st.columns(2)
     with left:
-        st.markdown("**Where it works**")
+        st.markdown("**Yes &mdash; for the kind of weather it studied**")
         st.markdown(
-            "<p class='note'>Tested on the same kind of weather it learned "
-            "from, the system is genuinely useful. Warnings it rated "
-            "<b>low trust</b> turned out wrong about <b>62%</b> of the time. "
-            "Warnings it rated <b>medium trust</b> were wrong about <b>25%</b> "
-            "of the time. Treating the low ones with caution would have "
-            "caught roughly <b>19 out of every 20 false alarms</b>.</p>",
-            unsafe_allow_html=True)
+            "<p class='note'>We trained the system on the 2021 and 2022 "
+            "monsoons and tested it on weather of the same kind. Warnings it "
+            "marked <b>low trust</b> were wrong about <b>6 times out of "
+            "10</b>. Warnings it marked <b>medium trust</b> were wrong about "
+            "<b>2 times out of 10</b>. Knowing that difference in advance is "
+            "genuinely useful.</p>", unsafe_allow_html=True)
     with right:
-        st.markdown("**Where it breaks**")
+        st.markdown("**No &mdash; for weather it had not seen**")
         st.markdown(
-            "<p class='note'>Tested on a later year, and on <b>June</b> &mdash; "
-            "the very start of the monsoon rather than its peak &mdash; it "
-            "stopped being useful. It still ranked forecasts sensibly, but it "
-            "could no longer put a trustworthy number on them.<br><br>"
-            "The reason matters: our definition of &ldquo;extreme rain&rdquo; "
-            "is set by the whole season, which is dominated by the wet "
-            "months. June is much drier, so that bar sits far too low for it. "
-            "The judgement did not fail &mdash; the yardstick did.</p>",
-            unsafe_allow_html=True)
+            "<p class='note'>We then tested it on <b>June 2024</b>, a later "
+            "year and the very beginning of the monsoon rather than its "
+            "peak. It stopped working. It could still put forecasts in "
+            "roughly the right order, but the scores it gave were no longer "
+            "trustworthy.<br><br>"
+            "We know why. We decide what counts as &ldquo;heavy rain&rdquo; "
+            "using the whole season, and the season is dominated by the "
+            "wettest months. June is much drier, so that bar is set far too "
+            "low for June. The problem is the definition of heavy rain, not the "
+            "scoring.</p>", unsafe_allow_html=True)
 
     st.write("")
     fig("region_map.png")
-    st.markdown("<p class='note'>Why one yardstick cannot work everywhere: in "
-                "the dry mountains of the north-west, a couple of millimetres "
-                "is remarkable. Around Lahore it takes thirty. The system "
-                "learns a separate bar for each square &mdash; but as the June "
-                "result shows, it also needs a separate bar for each part of "
-                "the season.</p>", unsafe_allow_html=True)
+    st.markdown("<p class='note'>Rain is not the same across the region. In "
+                "the dry mountains in the north-west, 2 mm of rain in a day "
+                "is unusual. Near Lahore it takes about 30 mm before anyone "
+                "notices. So the system sets a separate bar for every square "
+                "on this map. What June showed is that it also needs a "
+                "separate bar for different parts of the season.</p>",
+                unsafe_allow_html=True)
 
     # --- accountability ------------------------------------------------------
     st.write("")
-    st.markdown("### Why you do not have to take our word for it")
+    st.markdown("### You do not have to take our word for it")
     a1, a2, a3 = st.columns(3)
-    card(a1, "Forecasts on record", str(len(records)), "each one fingerprinted")
-    card(a2, "Sealed before the rain", "every one",
-         "timestamps come from the ledger, not from us", OK)
-    card(a3, "Try to fake one", "it fails",
-         "change any value and the seal breaks", OK)
-    st.markdown("<p class='note'>Open <b>Verify a record</b> and alter a "
-                "number &mdash; the check will fail in front of you. That is "
-                "the point: a claim about the future is only worth something "
-                "if it was provably made <i>before</i> the future "
-                "arrived.</p>", unsafe_allow_html=True)
+    card(a1, "Forecasts on record", str(len(records)), "each one locked and dated")
+    card(a2, "Locked before the rain", "all of them",
+         "the date stamp is not ours to set", OK)
+    card(a3, "If someone edits one", "the check fails", "try it yourself", OK)
+    st.markdown("<p class='note'>Go to <b>Verify a record</b>, change any "
+                "number, and press re-check. It will fail in front of you. "
+                "That is the whole point: saying &ldquo;we predicted "
+                "this&rdquo; afterwards means nothing unless you can prove "
+                "you said it beforehand.</p>", unsafe_allow_html=True)
 
-    with st.expander("The technical numbers, for reviewers"):
+    with st.expander("Technical detail, for reviewers"):
         fa = (ev or {}).get("targets", {}).get("false_alarm", {}).get(
             "metrics", {}).get("calibrated")
         ms = (ev or {}).get("targets", {}).get("miss", {}).get(
@@ -301,15 +369,15 @@ def page_overview():
         st.markdown(
             "The headline skill score is inflated by an extreme base rate on "
             "the held-out month and should be read alongside the trust-band "
-            "table, where every sample falls in a single band. Discrimination "
-            "is nearly unchanged between the two tests, which is what points "
+            "table, where every sample falls into one band. Discrimination "
+            "is almost unchanged between the two tests, which is what points "
             "at the event definition rather than the model.")
 
-    st.info("**Please read the limits before quoting anything here.** The "
-            "held-out test is a single month. The atmospheric measurements we "
-            "planned to use never arrived from the archive. The trust "
-            "categories are known to be badly positioned. None of that is "
-            "hidden; it is all in the technical report.")
+    st.info("**Please read the limits before quoting any number here.** The "
+            "final test covered a single month. Atmospheric measurements we "
+            "had planned to use never arrived from the data archive. The "
+            "trust categories are set at the wrong levels. All of this is "
+            "written up in the technical report rather than hidden.")
 
 
 def page_verify():
@@ -635,29 +703,66 @@ PAGES = {
 }
 
 
+PAGE_HINTS = {
+    "Overview": "Start here",
+    "Verify a record": "Check a forecast was not changed",
+    "Trust view": "Every forecast and what happened",
+    "Evaluation results": "How well it performed",
+    "The region": "Where this applies",
+    "Ledger status": "The tamper-proof record",
+}
+
+
 def main():
     st.set_page_config(page_title="MonsoonGuard AI", page_icon="🌧",
                        layout="wide", initial_sidebar_state="expanded")
     st.markdown(CSS, unsafe_allow_html=True)
 
-    st.sidebar.markdown("## 🌧 MonsoonGuard AI")
-    st.sidebar.caption("Detecting unreliable extreme rainfall forecasts "
-                       "in Pakistan")
-    choice = st.sidebar.radio("Page", list(PAGES), label_visibility="collapsed")
+    with st.sidebar:
+        st.markdown(
+            "<div class='brand'><div class='brand-name'>MonsoonGuard AI</div>"
+            "<div class='brand-sub'>Which heavy-rain warnings "
+            "to believe</div></div>", unsafe_allow_html=True)
 
-    st.sidebar.markdown("---")
-    info = chain_info()
-    if info is None:
-        st.sidebar.warning("**Registry:** local mock")
-    elif info.is_public:
-        st.sidebar.success("**Registry:** on chain\n\n`%s`" % info.address[:18] + "…")
-    else:
-        st.sidebar.info("**Registry:** local dev chain\n\nchain %d" % info.chain_id)
+        choice = st.radio("Page", list(PAGES), label_visibility="collapsed",
+                          captions=[PAGE_HINTS[p] for p in PAGES])
 
-    st.sidebar.markdown("---")
-    st.sidebar.caption(
-        "Read-only: results are produced by an offline pipeline and audited "
-        "here. The app never trains or recomputes.")
+        st.markdown("<div class='sb-rule'></div>", unsafe_allow_html=True)
+
+        records = load_records()
+        ev = load_evaluation()
+        tested = ", ".join((ev or {}).get("split", {}).get("test", [])) or "—"
+        st.markdown(
+            "<div class='sb-stats'>"
+            "<div class='sb-stat'><span>Forecasts on record</span><b>%d</b></div>"
+            "<div class='sb-stat'><span>Tested on</span><b>%s</b></div>"
+            "</div>" % (len(records), tested), unsafe_allow_html=True)
+
+        info = chain_info()
+        if info is None:
+            dot, label, detail = "#8c959f", "Local record store", \
+                "Records are held in a local tamper-proof store"
+        elif info.is_public:
+            dot, label, detail = OK, "Live on blockchain", info.address[:10] + "…"
+        else:
+            dot, label, detail = "#0969da", "Test blockchain", \
+                "Running on a local test chain"
+        st.markdown(
+            "<div class='sb-reg'><div class='sb-reg-top'>"
+            "<span class='dot' style='background:%s'></span>%s</div>"
+            "<div class='sb-reg-sub'>%s</div></div>" % (dot, label, detail),
+            unsafe_allow_html=True)
+        if info is not None and info.explorer_url:
+            st.markdown("<a class='sb-link' href='%s' target='_blank'>"
+                        "View on block explorer &rarr;</a>" % info.explorer_url,
+                        unsafe_allow_html=True)
+
+        st.markdown("<div class='sb-rule'></div>", unsafe_allow_html=True)
+        st.markdown(
+            "<div class='sb-foot'>This page only shows results. It never "
+            "runs the forecast models itself, so what you see is exactly "
+            "what was produced and recorded earlier.</div>",
+            unsafe_allow_html=True)
 
     PAGES[choice]()
 
