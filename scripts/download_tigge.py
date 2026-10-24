@@ -146,11 +146,60 @@ GROUP_TYPES = {
     "pressure": ("control",),
 }
 
-# Cheapest-useful-first. Precipitation defines the labels, so nothing can be
-# built without it, and its perturbed requests are by far the slowest - they
-# should hold slots while the small atmospheric requests fill the rest.
 GROUP_ORDER = {"precip": 0, "surface": 1, "pressure": 2}
 TYPE_ORDER = {"perturbed": 0, "control": 1}
+
+ATMOSPHERIC = ("surface", "pressure")
+
+
+def years_with_complete_precip(cfg, months) -> set[int]:
+    """Years whose precipitation is already fully on disk.
+
+    For such a year the only thing missing is atmospheric context, so a
+    handful of cheap control requests finishes the season outright.
+    """
+    by_year: dict[int, list[bool]] = {}
+    for month in months:
+        for short in ("pf", "cf"):
+            name = "precip_%s_%d_%02d.grib" % (short, month.year, month.month)
+            path = cfg.get_path("raw_tigge") / name
+            ok = path.exists() and path.stat().st_size > 0
+            by_year.setdefault(month.year, []).append(ok)
+    return {y for y, flags in by_year.items() if all(flags)}
+
+
+def work_priority(group_name: str, fc_type: str, month, complete_years: set[int]):
+    """Sort key deciding what to ask ECDS for next.
+
+    ECDS runs only one TIGGE job at a time per account during heavy usage and
+    jobs can hang for over a day (confirmed on the ECMWF forum), so the queue
+    may deliver only a handful more files. The order therefore maximises the
+    number of *fully usable* seasons rather than the number of files.
+
+    Tier 0  atmospheric context for a year whose precipitation is already
+            complete. These are the cheap control requests (~560 and ~280
+            fields per month), and each one moves a season from "labels only"
+            to "every feature in CLAUDE.md 7.2", which is what makes the
+            section 7.3 ablation possible.
+    Tier 1  precipitation for the remaining years. Expensive 30-member
+            requests, but nothing can be built for a season without them.
+    Tier 2  atmospheric context for years whose precipitation is still
+            missing - worth nothing until that precipitation arrives.
+
+    Chosen with the user on 2026-10-24: a smaller complete study beats a
+    larger one that cannot answer the research question.
+    """
+    atmospheric = group_name in ATMOSPHERIC
+    if atmospheric and month.year in complete_years:
+        tier = 0
+    elif group_name == "precip":
+        tier = 1
+    else:
+        tier = 2
+
+    short_key = "perturbed" if fc_type.startswith("perturbed") else "control"
+    return (tier, month.year, month.month,
+            GROUP_ORDER.get(group_name, 99), TYPE_ORDER.get(short_key, 99))
 
 
 def forecast_types(cfg, which: str, group_name: str | None = None) -> list[str]:
@@ -176,21 +225,18 @@ def planned_work(cfg, months, groups, selected, types_arg):
     Ordered group-major so that precipitation is requested before the
     atmospheric groups, since the labels depend on it.
     """
+    complete_years = years_with_complete_precip(cfg, months)
     plan = []
     for group_name in selected:
         for fc_type in forecast_types(cfg, types_arg, group_name):
-            short_key = ("perturbed" if fc_type.startswith("perturbed")
-                         else "control")
             for month in months:
                 plan.append((
-                    GROUP_ORDER.get(group_name, 99),
-                    TYPE_ORDER.get(short_key, 99),
-                    month.year, month.month,
+                    work_priority(group_name, fc_type, month, complete_years),
                     group_name, groups[group_name], fc_type, month,
                 ))
-    plan.sort(key=lambda row: row[:4])
+    plan.sort(key=lambda row: row[0])
     for row in plan:
-        yield row[4], row[5], row[6], row[7]
+        yield row[1], row[2], row[3], row[4]
 
 
 # --- submit -----------------------------------------------------------------

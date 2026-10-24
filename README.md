@@ -158,6 +158,23 @@ It currently does: the BoM RMM file ends 2024-02-24 and covers none of the 2024
 calibration or 2025 test seasons, so OMI is the MJO source. See
 `docs/decisions.md`.
 
+## Licensing
+
+The **code** in this repository is MIT licensed (see `LICENSE`).
+
+The **data is not ours to license and is not redistributed here** — only
+manifests with checksums are committed. If you re-run the download scripts,
+the data you receive carries its own terms:
+
+| Source | Terms |
+|---|---|
+| ECMWF TIGGE | Creative Commons Attribution–NonCommercial 4.0 (CC BY-NC 4.0); requires accepting the licence on your own ECMWF account |
+| NASA GPM IMERG | NASA open data; cite the product and version |
+| NOAA PSL OMI | NOAA open data |
+
+TIGGE's non-commercial clause matters: this project is research, and anyone
+reusing it commercially would need different terms from ECMWF.
+
 ## Repository layout
 
 ```

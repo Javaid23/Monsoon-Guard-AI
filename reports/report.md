@@ -310,6 +310,56 @@ sensitivity across 10/20/30/50% is reported in Section 4.1.
 
 ---
 
+## 6a. Related work
+
+Each reference below was checked before citing (CLAUDE.md section 12).
+
+**Decentralized Weather Forecasting via Distributed Machine Learning and
+Blockchain-Based Model Validation** (Umar et al., arXiv:2508.09299, 2025)
+is the closest work on combining weather forecasting with a chain. They use
+federated learning so participants train without sharing data, and an
+Ethereum contract with reputation-weighted voting to validate submitted model
+updates, with IPFS for off-chain storage.
+
+The contrast is instructive. They put the **model** on chain, to decide whose
+contribution to trust in a multi-party setting. We put the **claim** on chain,
+to fix what a single forecaster asserted before the outcome was knowable. Our
+registry deliberately holds no consensus mechanism and no voting: it is an
+append-only timestamp, and we are explicit that it cannot prove a forecast was
+good or that no forecast was omitted.
+
+**Foresight Arena: An On-Chain Benchmark for Evaluating AI Forecasting
+Agents** (Nechepurenko and Shuvalov, arXiv:2605.00420, 2026) is
+methodologically very close to the audit half of this project. Agents submit
+probabilistic forecasts through a **commit-reveal protocol** enforced by
+Solidity contracts on Polygon, and are scored with the **Brier score** —
+the same proper scoring rule we use, chosen for the same reason, that it
+rewards honest probability reporting rather than confident guessing.
+
+Two differences matter. Their outcomes resolve trustlessly through prediction
+markets; ours resolve against a satellite product (IMERG) that is itself an
+estimate with real error over mountains and snow, so our "ground truth" is
+weaker than theirs by construction. And they benchmark agents competitively,
+while we evaluate one pipeline against climatology. Their framing suggests a
+natural extension: a permissionless version of this where multiple forecast
+providers commit trust labels for the same region and window, and are scored
+against each other on Brier skill.
+
+**Ensemble calibration and verification.** The metrics here are the standard
+ones from that literature — Brier score and Brier skill score, reliability
+diagrams, expected calibration error, and the contingency-table measures
+(POD, FAR, CSI, frequency bias). Isotonic regression as a post-hoc calibration
+step on a class-weighted model is likewise standard practice; Section 4.2
+shows why it was not optional here.
+
+**AI weather models (ECMWF AIFS and related work)** are deliberately *not* a
+comparison point. Those systems aim to produce better forecasts. This project
+takes an existing forecast as given and asks when to distrust it, which is a
+complementary question — a learned forecast model would also benefit from an
+error model of this kind, and the method here is not specific to NCEP.
+
+---
+
 ## 7. What would change the conclusions
 
 In rough order of value:

@@ -1,10 +1,9 @@
-# MonsoonGuard AI - pinned to the versions verified working on Windows,
-# Python 3.11.4. Regenerate with: .venv/Scripts/pip freeze
+# MonsoonGuard AI - pinned to the versions this project was built and tested
+# with on Windows, Python 3.11.4. Regenerate with: .venv/Scripts/pip freeze
 #
-# Not yet installed (added at the phase that needs them):
-#   cfgrib + eccodes   - GRIB reading (phase 1); on Windows use conda if pip fails
-#   scikit-learn, xgboost, lightgbm, shap, matplotlib  - phases 5-7
-#   streamlit, web3    - phases 8-11
+# A clean install of this file is enough to run every stage: download,
+# labelling, the frozen evaluation, figures, the audit layer and the app.
+# The Solidity contract needs Node instead - see package.json.
 
 # --- core data ---
 numpy==2.4.6
@@ -13,12 +12,27 @@ xarray==2026.9.0
 h5py==3.16.0
 h5netcdf==1.8.1
 netCDF4==1.7.5
+pyarrow==26.0.0
+
+# --- GRIB reading ---
+# eccodes ships the binary ecCodes library; on Windows this works via pip and
+# the conda fallback in CLAUDE.md section 4 was not needed.
+cfgrib==0.9.15.1
+eccodes==2.50.0
 
 # --- download clients ---
 # ECDS (ECMWF Data Store) replaced ecmwf-api-client on 2026-05-27
 earthaccess==0.17.0
 cdsapi==0.7.7
 requests==2.34.2
+
+# --- modelling ---
+scikit-learn==1.9.1
+scipy==1.17.1
+
+# --- figures and app ---
+matplotlib==3.11.2
+streamlit==1.66.1
 
 # --- config and tooling ---
 PyYAML==6.0.3

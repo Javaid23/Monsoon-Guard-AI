@@ -187,6 +187,31 @@ prove no forecast was quietly omitted.
 
 ---
 
+## How this differs from prior work
+
+Two closely related papers, both checked before citing:
+
+**arXiv:2508.09299** (Umar et al., 2025) puts weather *models* on chain:
+federated learning plus reputation-weighted voting to decide whose model
+update to trust. We put the *claim* on chain instead — no consensus, no
+voting, just an append-only timestamp fixing what one forecaster asserted
+before the outcome was knowable.
+
+**arXiv:2605.00420, Foresight Arena** (2026) is methodologically very close
+to our audit half: commit-reveal forecasting on Polygon, scored by Brier.
+The difference is that their outcomes resolve trustlessly via prediction
+markets, while ours resolve against a satellite estimate that carries real
+error over mountains — our ground truth is weaker by construction, and we
+say so. Their competitive framing also suggests the natural next step:
+multiple providers committing trust labels for the same region and window,
+scored against each other.
+
+We deliberately do **not** compete with AI weather models like ECMWF's AIFS.
+Those try to forecast better. We take a forecast as given and ask when to
+distrust it — complementary, and not specific to NCEP.
+
+---
+
 ## Built with
 
 Python 3.11 · xarray · cfgrib/ecCodes · scikit-learn · earthaccess ·
