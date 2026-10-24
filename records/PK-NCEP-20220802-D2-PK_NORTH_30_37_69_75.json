@@ -1,0 +1,23 @@
+{
+  "code_commit": "91e9b807b7b210d7ecffbb1d14106e30023cf24f",
+  "event_definition": {
+    "signal_rule": "member_fraction_ge_2000bp",
+    "threshold_manifest": "thresholds_v1",
+    "threshold_rule": "p95_jjas_train_months_per_cell",
+    "variable": "daily_precipitation"
+  },
+  "forecast_id": "PK-NCEP-20220802-D2-PK_NORTH_30_37_69_75",
+  "forecast_source": "TIGGE_NCEP_ecds",
+  "input_data_manifest": "manifests_43_files",
+  "issue_time_utc": "2022-08-02T00:00:00Z",
+  "lead_hours": 48,
+  "model_version": "monsoonguard_v0.1",
+  "p_wrong_bp": 7308,
+  "region_id": "pk_north_30_37_69_75",
+  "schema_version": "1.0",
+  "signal_bp": 5581,
+  "trust_band_rule": "bands_v1",
+  "trust_label": "LOW",
+  "window_end_utc": "2022-08-04T00:00:00Z",
+  "window_start_utc": "2022-08-03T00:00:00Z"
+}

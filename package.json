@@ -1,0 +1,15 @@
+{
+  "name": "monsoonguard-contracts",
+  "private": true,
+  "version": "0.1.0",
+  "description": "ForecastRegistry: tamper-evident commit log for MonsoonGuard AI forecast records",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "deploy:amoy": "hardhat run contracts/scripts/deploy.js --network amoy"
+  },
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "hardhat": "^2.22.17"
+  }
+}

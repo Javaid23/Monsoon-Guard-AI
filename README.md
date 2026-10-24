@@ -14,14 +14,40 @@ trail only, and proves commit timing, not correctness.
 See `CLAUDE.md` for the full specification and `docs/decisions.md` for every
 decision made and why.
 
+## Results at a glance
+
+Can ensemble spread tell us when a forecast will be wrong?
+
+| Error model | Brier skill vs climatology | ROC AUC | Verdict |
+|---|---|---|---|
+| **False alarm** | **+0.29** | 0.735 | real skill |
+| **Miss** | +0.012 | 0.702 | discriminates, but adds ~nothing |
+
+Trust bands separate error rates by 2.5-3.7x, but are badly positioned (the
+HIGH band is empty for false alarms). The test set is two months inside a
+single exceptional season, so **no cross-season generalisation is shown**.
+Read [reports/report.md](reports/report.md) - especially Section 6 - before
+using any number here.
+
 ## Status
 
 | Phase | Work | State |
 |---|---|---|
 | 0 | Repo, environment, config, tests | done |
-| 1 | GRIB and IMERG loaders, alignment | not started |
-| 2 | Download scripts, manifests | IMERG done (OPeNDAP); TIGGE on ECDS |
-| 3+ | Labels, features, models, audit layer | not started |
+| 1 | Loaders, alignment, acceptance checks | done |
+| 2 | Download scripts, manifests | done |
+| 3 | Full archive download | **partial: 19/40 TIGGE files; no 2024/2025** |
+| 4 | Thresholds, signals, labels | done |
+| 5 | Features, baselines, logistic regression | done |
+| 6 | Calibration, trust bands | done (ablations and SHAP not reached) |
+| 7 | Frozen evaluation, case study | evaluation done on reduced split |
+| 8 | Records, hashing, mock registry, verification | done |
+| 9 | Testnet deployment, live ledger | not reached (mock registry documented) |
+| 10 | Report, README | done |
+
+The split had to be re-frozen onto available data because ECMWF never
+delivered 2024 or 2025 before the deadline. That decision, and everything it
+costs, is recorded in [docs/decisions.md](docs/decisions.md).
 
 ## Setup
 
@@ -101,6 +127,20 @@ python scripts/download_mjo.py                 # RMM and OMI
 python scripts/download_mjo.py --check-only    # re-check local copies
 ```
 
+## Running the science
+
+```bash
+python scripts/build_labels.py          # thresholds, signals, error targets
+python scripts/run_evaluation.py        # the frozen evaluation (run once)
+python scripts/build_records.py         # hashed records + mock registry
+pytest -q                               # 147 tests
+```
+
+`scripts/provisional_baseline.py` runs the model ladder on training months
+only, for use while data is still downloading. It refuses to run once
+calibration or test data exists, so it cannot be confused with the frozen
+evaluation.
+
 This script exits non-zero when an index does not cover the configured seasons.
 It currently does: the BoM RMM file ends 2024-02-24 and covers none of the 2024
 calibration or 2025 test seasons, so OMI is the MJO source. See
@@ -111,7 +151,13 @@ calibration or 2025 test seasons, so OMI is the MJO source. See
 ```
 configs/project.yaml   every frozen decision, path and seed
 src/core/              science code, no blockchain imports
-src/audit/             record hashing, registry client, verification
+src/core/features.py   ensemble, neighbourhood, context, MJO features
+src/core/models.py     the two conditional error models and the model ladder
+src/core/calibrate.py  isotonic/Platt calibration, trust bands, reliability
+src/core/evaluate.py   POD/FAR/CSI verification, block bootstrap by week
+src/audit/             record hashing, mock registry, verification
+reports/report.md      the technical report
+records/               public forecast records + mock registry
 scripts/               data download
 tests/                 invariants: splits, grids, units, time, hashes
 data/raw/              append-only downloads (gitignored)

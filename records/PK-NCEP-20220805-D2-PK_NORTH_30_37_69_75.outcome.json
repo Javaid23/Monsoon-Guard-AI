@@ -1,0 +1,16 @@
+{
+  "decision_was_wrong": true,
+  "event_occurred": false,
+  "forecast_hash": "7269e37688c222222e9631fdf95c35e74d433b6d6a09c22e44d92db6f029aa3d",
+  "forecast_id": "PK-NCEP-20220805-D2-PK_NORTH_30_37_69_75",
+  "observation": {
+    "product": "GPM_3IMERGDF",
+    "run": "Final",
+    "version": "07"
+  },
+  "observed_value_hundredths_mm": 13,
+  "retrieved_utc": "2022-08-08T00:00:00Z",
+  "schema_version": "1.0",
+  "window_end_utc": "2022-08-07T00:00:00Z",
+  "window_start_utc": "2022-08-06T00:00:00Z"
+}

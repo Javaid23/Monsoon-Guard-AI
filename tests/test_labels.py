@@ -90,11 +90,20 @@ def test_threshold_is_unchanged_by_altering_test_years(cfg):
 
 
 def test_threshold_day_count_matches_the_training_calendar(cfg):
-    """The active train split is 2021 JJAS: 30+31+31+30 = 122 days."""
+    """Thresholds use every training day and nothing else.
+
+    JJAS is 122 days per season, so the count must be 122 per training year.
+    The training split is read from the configuration rather than written in
+    here, because it was re-frozen on 2026-10-24 (docs/decisions.md) and the
+    invariant under test is "exactly the training calendar", not any one span.
+    """
+    from src.core.config import split_years
+
     obs = _obs([2021, 2022, 2023])
     th = compute_thresholds(obs, cfg)
-    assert th.n_days_used == 122
-    assert th.years_used == [2021]
+    train_years = split_years(cfg, "train")
+    assert th.years_used == train_years
+    assert th.n_days_used == 122 * len(train_years)
 
 
 def test_threshold_is_the_requested_percentile(cfg):

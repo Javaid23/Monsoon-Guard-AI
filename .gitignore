@@ -31,3 +31,10 @@ Thumbs.db
 
 # cfgrib index caches (should not appear: indexpath is disabled)
 *.idx
+
+# Solidity / Hardhat toolchain
+# package-lock.json is deliberately NOT ignored: CLAUDE.md section 12 requires
+# pinned dependencies for a reproducible build.
+node_modules/
+contracts/artifacts/
+contracts/.cache/

@@ -26,7 +26,10 @@ region:
 
 season:
   months: [6, 7, 8, 9]       # JJAS
-  years: [2021, 2022, 2023, 2024, 2025]
+  # 2025 dropped 2026-10-24: see docs/decisions.md. ECDS serves TIGGE from tape
+  # one job at a time, with observed server-side waits up to 18 h 44 min per
+  # month, so 2025 could not be retrieved before the submission deadline.
+  years: [2021, 2022, 2023, 2024]
 
 forecast:
   source: TIGGE_NCEP
@@ -102,7 +105,7 @@ trust_bands:
 
 split:
   # ORIGINAL DESIGN (CLAUDE.md section 3): train 2021-2023, calibrate 2024,
-  # test 2025. Unreachable: ECDS never delivered 2024 or 2025 before the
+  # test 2025. Unreachable: 2025 cannot be retrieved from ECDS before the
   # submission deadline. CLAUDE.md section 3 permits "Adjust if data coverage
   # differs". Re-frozen 2026-10-24 BEFORE any test result was viewed.
   # See docs/decisions.md for the full record.
@@ -113,13 +116,26 @@ split:
     reachable: false
 
   # ACTIVE SPLIT - month level, chronological, no overlap.
-  train_months: ["2021-06", "2021-07", "2021-08", "2021-09"]
-  calibration_months: ["2022-06", "2022-07"]
-  test_months: ["2022-08", "2022-09"]
+  # Four seasons (2021-2024), one season per role beyond training. This keeps
+  # the original design's shape - train on the earliest years, calibrate on one
+  # held-out season, test on the latest - with the test season moved from 2025
+  # to 2024. Conditional on 2023 and 2024 arriving; `make status` reports
+  # coverage, and docs/decisions.md records the fallback if they do not.
+  train_months: ["2021-06", "2021-07", "2021-08", "2021-09",
+                 "2022-06", "2022-07", "2022-08", "2022-09"]
+  calibration_months: ["2023-06", "2023-07", "2023-08", "2023-09"]
+  test_months: ["2024-06", "2024-07", "2024-08", "2024-09"]
 
+  # August 2022 now sits inside the training years, so it cannot be used as a
+  # held-out case study under the active split. It is evaluated by a separate
+  # leave-2022-out run (CLAUDE.md section 9) and must be reported as a
+  # leave-one-season-out check, never as part of the chronological test.
   case_study:
     name: flood_2022_august
     months: ["2022-08"]
+    protocol: leave_one_season_out
+    train_years: [2021, 2023, 2024]
+    test_years: [2022]
 
 paths:
   raw_tigge: data/raw/tigge_ncep

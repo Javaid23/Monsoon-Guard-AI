@@ -527,3 +527,93 @@ visible rather than quietly overwritten.
 restore the original split and re-run; the test split would then be genuinely
 untouched, since the models trained under this reduced split would be
 discarded rather than carried over.
+
+## 2026-10-24 — Split widened to 2021-2024 after fixing the ECDS download
+
+**Supersedes the entry above** (`Split re-frozen on available data`), under the
+condition that entry itself set: "If the remaining data arrives before
+submission, the correct action is to restore the original split and re-run."
+
+**Decision.** Four seasons, 2021-2024.
+
+| Role | Months |
+|---|---|
+| Train | 2021 JJAS + 2022 JJAS (8 months) |
+| Calibration | 2023 JJAS (4 months) |
+| Test | 2024 JJAS (4 months) |
+| Case study | 2022-08, by a separate leave-2022-out run |
+
+2025 is dropped. `split.original_design` keeps the CLAUDE.md section 3 design
+recorded with `reachable: false`.
+
+**Why the earlier cut was wrong about the cause.** The previous entry
+attributed the missing data to "a shared global MARS tape queue whose position
+grew while we were idle", and concluded 2024 and 2025 could never arrive. The
+queue is real - server-side waits for one month of NCEP precipitation (about
+1.5 MB) ranged from 7 minutes to 18 h 44 min - but it was not the whole story.
+Three faults in our own downloader were losing most of the throughput:
+
+1. `cdsapi.Client.retrieve()` couples submit, wait and download into one
+   blocking call, so a multi-hour tape wait had to be held open on the
+   network. When the link dropped, the wait was forfeited.
+2. A forfeited wait left the job running server-side, where it kept occupying
+   the account's slot and blocked everything submitted behind it. On
+   2026-10-24 the retry was queued behind two of its own stranded jobs.
+3. Job results expire. 2023-08 completed on 2026-10-17 while nothing was
+   listening, and its results were purged before the next attempt, so the
+   tape wait had to be paid twice.
+
+**What changed.** `src/core/ecds.py` talks to the ECDS OGC Processes API
+directly and separates submission from collection. Job ids are persisted to
+`data/manifests/tigge_jobs.json`, so collection survives interruption and
+resumes, and jobs stranded by the old blocking runs were adopted by id rather
+than requeued - recovering four months of queue position that would otherwise
+have been thrown away.
+
+**The quota, found the hard way.** Submitting all outstanding months at once
+does not work. ECDS caps in-flight requests per account: over the cap it still
+returns HTTP 201 with a job id and status `accepted`, then flips the job to
+`rejected` within about 30 seconds and records no reason. Observed on
+2026-10-24: with 4 jobs already queued, 9 more were submitted in one burst and
+all 9 were rejected, while the original 4 ran to completion. Identical
+requests had succeeded when submitted a few at a time.
+
+So the downloader keeps at most `--max-in-flight` jobs queued (default 4) and
+requeues a rejected month when a slot frees. A rejection is treated as "try
+again later", never as a bad request. This still runs four tape reads in
+parallel where `cdsapi` ran one.
+
+**Verification, not trust.** An adopted job's request parameters cannot be read
+back from the API, so they are inferred from our submission logs. Every
+downloaded file is therefore read back with `io_tigge.load_file` and checked
+that its issue dates fall in the month the filename claims, with the member
+count and grid recorded in the manifest. A file that fails is moved aside as
+`.grib.unverified` rather than entering `data/raw` under a name asserting the
+wrong month.
+
+**What this recovers relative to the superseded entry.** A real calibration
+season and a real test season, held separately from training; a test split of
+four months in a season that is not the 2022 flood, so results are no longer
+dominated by one exceptional event; and a genuinely independent leave-2022-out
+case study, since 2022 is now training data rather than the test set.
+
+**What is still lost, and must be stated in the report.**
+
+- Four seasons, not five. The test set is one season (2024 JJAS), so
+  year-to-year generalisation rests on a single held-out year.
+- Extreme events per cell remain few and neighbouring cells and days are
+  strongly correlated (CLAUDE.md section 15). The block bootstrap by calendar
+  week has roughly 17 blocks in the test split.
+- 2022-08 is now inside the training years, so the flood replay must be
+  reported as a leave-one-season-out check, never as part of the
+  chronological test.
+
+**Models trained under the superseded split are discarded, not carried over,**
+so the 2024 test split stays untouched until the protocol is frozen and run
+once (CLAUDE.md section 8.1).
+
+**Conditional on delivery.** The split assumes 2023 and 2024 land before
+submission. `python scripts/download_tigge.py status` reports coverage. If a
+month is still missing at the cutoff, the fallback is to drop the test year to
+2023 and calibrate on a held-out block of 2022, recorded here before any test
+result is viewed.

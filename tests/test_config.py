@@ -125,17 +125,23 @@ def test_season_month_boundaries():
     assert july.n_days == 31
 
 
-def test_season_day_count_is_610(cfg):
-    """JJAS is 122 days; five seasons is 610. CLAUDE.md section 3 says 'about 610'."""
+def test_season_day_count_matches_the_frozen_seasons(cfg):
+    """JJAS is 122 days per season.
+
+    CLAUDE.md section 3 sizes the sample at 'about 610' days, i.e. five
+    seasons. 2025 was dropped on 2026-10-24 because ECDS could not deliver it
+    before the deadline (docs/decisions.md), leaving four seasons = 488 days.
+    """
     assert expected_season_days(cfg, [2022]) == 122
-    assert expected_season_days(cfg) == 610
+    n_years = len(cfg["season"]["years"])
+    assert expected_season_days(cfg) == 122 * n_years
 
 
 def test_season_months_are_in_order(cfg):
     months = list(season_months(cfg))
-    assert len(months) == 20
+    assert len(months) == 4 * len(cfg["season"]["years"])
     assert str(months[0]) == "2021-06"
-    assert str(months[-1]) == "2025-09"
+    assert str(months[-1]) == "2024-09"
     keys = [(m.year, m.month) for m in months]
     assert keys == sorted(keys)
 
