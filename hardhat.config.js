@@ -14,6 +14,27 @@ const AMOY_RPC_URL =
   // polygon.technology's own endpoint does not resolve on some
   // networks; publicnode is a working public alternative.
   "https://polygon-amoy-bor-rpc.publicnode.com";
+
+// RPC endpoints. Either paste a full URL, or set ALCHEMY_API_KEY alone and
+// let the per-network URL be built from it. publicnode is a keyless fallback
+// so a clean checkout still works, but it rate-limits, so prefer Alchemy for
+// anything that sends transactions.
+const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY || "";
+const alchemy = (subdomain) =>
+  ALCHEMY_API_KEY ? `https://${subdomain}.g.alchemy.com/v2/${ALCHEMY_API_KEY}` : "";
+
+const SEPOLIA_RPC_URL =
+  process.env.SEPOLIA_RPC_URL || alchemy("eth-sepolia") ||
+  "https://ethereum-sepolia-rpc.publicnode.com";
+const BASE_SEPOLIA_RPC_URL =
+  process.env.BASE_SEPOLIA_RPC_URL || alchemy("base-sepolia") ||
+  "https://base-sepolia-rpc.publicnode.com";
+const MAINNET_RPC_URL =
+  process.env.MAINNET_RPC_URL || alchemy("eth-mainnet") ||
+  "https://ethereum-rpc.publicnode.com";
+const BASE_RPC_URL =
+  process.env.BASE_RPC_URL || alchemy("base-mainnet") ||
+  "https://base-rpc.publicnode.com";
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
 
 /** @type import('hardhat/config').HardhatUserConfig */
@@ -42,5 +63,40 @@ module.exports = {
       chainId: 80002,
       accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
     },
+    // Ethereum Sepolia. Added because every Amoy faucet we tried requires an
+    // existing mainnet balance, while Sepolia has a proof-of-work faucet
+    // that asks for nothing but browser time. The contract is plain Solidity
+    // and chain-agnostic, so it deploys identically on either.
+    sepolia: {
+      url: SEPOLIA_RPC_URL,
+      chainId: 11155111,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+    // Base Sepolia. The one testnet whose faucet (Coinbase's developer
+    // portal) does not demand an existing mainnet balance, which is what
+    // blocked every Amoy and Sepolia faucet we tried.
+    baseSepolia: {
+      url: BASE_SEPOLIA_RPC_URL,
+      chainId: 84532,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+    // Real networks. Deploying here spends real money, so CLAUDE.md section
+    // 2.4 requires asking first; nothing in the repo deploys automatically.
+    // The 'paris' EVM target is conservative but valid on all of them.
+    mainnet: {
+      url: MAINNET_RPC_URL,
+      chainId: 1,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+    base: {
+      url: BASE_RPC_URL,
+      chainId: 8453,
+      accounts: DEPLOYER_PRIVATE_KEY ? [DEPLOYER_PRIVATE_KEY] : [],
+    },
+  },
+  etherscan: {
+    // Source verification, so judges read the contract rather than bytecode.
+    // One free key from etherscan.io covers Etherscan and Basescan.
+    apiKey: process.env.ETHERSCAN_API_KEY || "",
   },
 };

@@ -69,6 +69,35 @@ contract ForecastRegistry {
         uint64 recordedAt
     );
 
+    /// @dev A published result set. Distinct from `Forecast` on purpose:
+    /// an archive makes a *weaker* claim. `commit` asserts "we said this
+    /// before the rain"; an archive asserts only "this exact set of results
+    /// existed, unaltered, at this block timestamp". The second claim is the
+    /// honest one for a retrospective study, where the rain already fell and
+    /// the outcome was already knowable. Conflating the two would let a
+    /// backdated result pose as a prediction, so they are kept apart.
+    struct Archive {
+        bytes32 merkleRoot;   // root over the record hashes, sorted-pair
+        uint64 publishedAt;   // block.timestamp at publication
+        uint32 leafCount;     // number of records covered
+        string label;         // e.g. "jjas-2022-replay"
+    }
+
+    /// @notice Every published archive, in publication order.
+    Archive[] public archives;
+
+    /// @dev Guards against publishing the same root twice, which would make
+    /// the history ambiguous about which publication a proof refers to.
+    mapping(bytes32 => bool) private _rootPublished;
+
+    event ArchivePublished(
+        uint256 indexed index,
+        bytes32 indexed merkleRoot,
+        string label,
+        uint32 leafCount,
+        uint64 publishedAt
+    );
+
     error NotOwner();
     error EmptyForecastId();
     error EmptyHash();
@@ -79,6 +108,9 @@ contract ForecastRegistry {
     error OutcomeAlreadyRecorded(string forecastId);
     error WindowNotClosed(uint64 now_, uint64 windowEnd);
     error IndexOutOfRange(uint256 index, uint256 length);
+    error EmptyLabel();
+    error EmptyArchive();
+    error DuplicateArchiveRoot(bytes32 merkleRoot);
 
     modifier onlyOwner() {
         if (msg.sender != owner) revert NotOwner();
@@ -163,6 +195,73 @@ contract ForecastRegistry {
         f.outcomeRecordedAt = nowTs;
 
         emit OutcomeRecorded(k, forecastId, outcomeHash, nowTs);
+    }
+
+    // --- archives ------------------------------------------------------------
+
+    /// @notice Publish a Merkle root over a finished set of record hashes.
+    ///
+    /// This is the route for retrospective results, where `commit` must not
+    /// be used: the rain window closed years ago, so no timestamp this chain
+    /// can produce would prove foreknowledge, and pretending otherwise would
+    /// be a false claim. What a timestamp here does prove is integrity from
+    /// this moment on - the results cannot be edited afterwards without the
+    /// root changing. (CLAUDE.md section 10.4 allows a Merkle root batch.)
+    ///
+    /// One transaction covers any number of records. Anyone can later check a
+    /// single record against the root with `verifyArchiveProof`, so the whole
+    /// set stays individually verifiable without storing every hash on chain.
+    ///
+    /// @param merkleRoot Root of a sorted-pair Merkle tree over the leaves.
+    /// @param leafCount  How many records the tree covers.
+    /// @param label      Short name for the set, e.g. "jjas-2022-replay".
+    function publishArchive(
+        bytes32 merkleRoot,
+        uint32 leafCount,
+        string calldata label
+    ) external onlyOwner returns (uint256 index) {
+        if (merkleRoot == bytes32(0)) revert EmptyHash();
+        if (leafCount == 0) revert EmptyArchive();
+        if (bytes(label).length == 0) revert EmptyLabel();
+        if (_rootPublished[merkleRoot]) revert DuplicateArchiveRoot(merkleRoot);
+
+        uint64 nowTs = uint64(block.timestamp);
+        _rootPublished[merkleRoot] = true;
+        archives.push(Archive({
+            merkleRoot: merkleRoot,
+            publishedAt: nowTs,
+            leafCount: leafCount,
+            label: label
+        }));
+        index = archives.length - 1;
+
+        emit ArchivePublished(index, merkleRoot, label, leafCount, nowTs);
+    }
+
+    /// @notice Check one record hash against a published archive root.
+    /// @dev Sorted-pair hashing, so a proof carries no position bits. Returns
+    /// false rather than reverting on a bad proof: this is a question, not an
+    /// assertion, and callers should be able to ask it cheaply.
+    function verifyArchiveProof(
+        uint256 index,
+        bytes32 leaf,
+        bytes32[] calldata proof
+    ) external view returns (bool) {
+        if (index >= archives.length) {
+            revert IndexOutOfRange(index, archives.length);
+        }
+        bytes32 node = leaf;
+        for (uint256 i = 0; i < proof.length; i++) {
+            bytes32 sibling = proof[i];
+            node = node <= sibling
+                ? keccak256(abi.encodePacked(node, sibling))
+                : keccak256(abi.encodePacked(sibling, node));
+        }
+        return node == archives[index].merkleRoot;
+    }
+
+    function archiveCount() external view returns (uint256) {
+        return archives.length;
     }
 
     // --- reads ---------------------------------------------------------------

@@ -69,6 +69,8 @@ class ChainInfo:
         return {
             80002: "https://amoy.polygonscan.com/address/%s" % self.address,
             137: "https://polygonscan.com/address/%s" % self.address,
+            11155111: "https://sepolia.etherscan.io/address/%s" % self.address,
+            84532: "https://sepolia.basescan.org/address/%s" % self.address,
         }.get(self.chain_id)
 
     @property

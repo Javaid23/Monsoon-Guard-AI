@@ -183,6 +183,27 @@ def load_evaluation() -> dict | None:
 
 
 @st.cache_data
+def load_archive() -> dict | None:
+    """The published fingerprint of the whole result set, if there is one."""
+    p = RECORDS / "archive_manifest.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+@st.cache_data
+def load_bitcoin_anchor() -> dict | None:
+    """Written only once Bitcoin has confirmed the timestamp, so its absence
+    is the honest signal that the anchor is still pending."""
+    p = RECORDS / "bitcoin_anchor.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+@st.cache_data
+def load_deployment() -> dict | None:
+    p = RECORDS / "registry_deployment.json"
+    return json.loads(p.read_text(encoding="utf-8")) if p.exists() else None
+
+
+@st.cache_data
 def load_thresholds() -> pd.DataFrame | None:
     p = REPORTS / "thresholds_grid.csv"
     return pd.read_csv(p) if p.exists() else None
@@ -381,316 +402,449 @@ def page_overview():
 
 
 def page_verify():
-    hero("Verify a forecast record",
-         "Recompute the SHA-256 of a published record, compare it with the "
-         "hash held in the registry, and confirm the commit happened before "
-         "the rain window opened.",
-         "Nothing here is taken on trust — every claim is recomputed in your browser session")
+    hero("Check that a forecast was not changed afterwards",
+         "Every forecast here was given a digital fingerprint and locked away "
+         "<b>before</b> the rain was due. This page recreates that "
+         "fingerprint from the saved forecast and compares it with the locked "
+         "copy. If anybody edited so much as one number, the two will not "
+         "match.",
+         "Nothing is taken on trust &mdash; the check runs in front of you")
 
     records = load_records()
     if not records:
-        st.warning("No published records are available yet.")
+        st.warning("No forecasts are available yet.")
         return
 
     left, right = st.columns([3, 2])
-    chosen = left.selectbox("Forecast record", sorted(records),
+    chosen = left.selectbox("Forecast", sorted(records),
                             label_visibility="collapsed")
-    pasted = right.text_input("Paste an id instead", value="",
-                              placeholder="…or paste a forecast id",
+    pasted = right.text_input("Reference", value="",
+                              placeholder="…or paste a forecast reference",
                               label_visibility="collapsed")
     fid = pasted.strip() or chosen
 
     record = records.get(fid)
     if record is None:
-        st.error("No published record with id `%s`." % fid)
+        st.error("There is no forecast with that reference.")
         return
 
     entry = registry().get(record["forecast_id"])
     outcome = load_outcome(fid)
     result = verify_record(record, entry, outcome)
-    colour, title, blurb = STATUS_STYLE.get(result.status, (MUTED, result.status.value, ""))
+    colour, title, blurb = STATUS_STYLE.get(
+        result.status, (MUTED, result.status.value, ""))
 
-    st.markdown("<div class='statusbar' style='background:%s'>%s<small>%s</small></div>"
-                % (colour, title, blurb), unsafe_allow_html=True)
+    st.markdown("<div class='statusbar' style='background:%s'>%s<small>%s"
+                "</small></div>" % (colour, title, blurb),
+                unsafe_allow_html=True)
 
     trust = record.get("trust_label", "—")
+    friendly = {"HIGH": "Likely reliable", "MEDIUM": "Treat with care",
+                "LOW": "Likely wrong"}.get(trust, trust)
     c1, c2, c3, c4 = st.columns(4)
-    card(c1, "Trust label", trust, "calibrated band", TRUST_STYLE.get(trust, INK))
-    card(c2, "P(decision wrong)", "%.1f%%" % (record["p_wrong_bp"] / 100), "calibrated")
-    card(c3, "Ensemble signal", "%.1f%%" % (record["signal_bp"] / 100), "members over threshold")
-    card(c4, "Lead time", "%d h" % record["lead_hours"], "ahead of the window")
+    card(c1, "Our rating", friendly, "based on model disagreement",
+         TRUST_STYLE.get(trust, INK))
+    card(c2, "Chance this warning is wrong",
+         "%.0f out of 100" % (record["p_wrong_bp"] / 100), "our estimate")
+    card(c3, "Computer runs predicting rain",
+         "%.0f of 100" % (record["signal_bp"] / 100), "out of 30 runs, scaled")
+    card(c4, "Issued in advance", "%d days" % (record["lead_hours"] // 24),
+         "before the rain was due")
 
     st.write("")
-    st.subheader("Checks")
+    st.subheader("The checks")
+    FRIENDLY = {
+        "registry entry exists": "A locked copy exists",
+        "record matches committed hash":
+            "The forecast has not been altered",
+        "committed before window opened":
+            "It was locked before the rain was due",
+        "outcome recorded": "The real rainfall was added afterwards",
+        "outcome matches committed hash": "The rainfall record is unaltered",
+        "outcome links to this forecast":
+            "The rainfall belongs to this forecast",
+        "outcome recorded after window closed":
+            "The rainfall was added only after the day had passed",
+    }
     for name, passed, detail in result.checks:
-        st.markdown("<div class='check'>%s <b>%s</b><br><span class='d'>%s</span></div>"
-                    % ("✅" if passed else "❌", name, detail or "—"),
-                    unsafe_allow_html=True)
+        st.markdown("<div class='check'>%s <b>%s</b><br><span class='d'>%s"
+                    "</span></div>"
+                    % ("✅" if passed else "❌", FRIENDLY.get(name, name),
+                       detail or "—"), unsafe_allow_html=True)
 
     st.write("")
-    a, b = st.columns(2)
-    with a:
-        st.markdown("**Hash**")
-        st.code("recomputed  %s\nregistry    %s"
-                % (result.computed_hash or "—", result.registry_hash or "—"),
-                language=None)
-    with b:
-        st.markdown("**Timing**")
-        if entry:
-            st.code("committed     %s\nwindow opens  %s\nwindow closes %s\noutcome       %s"
-                    % (entry.committed_utc, entry.window_start_utc,
-                       entry.window_end_utc, entry.outcome_recorded_utc or "—"),
-                    language=None)
-
-    st.write("")
-    st.markdown("### Does tamper detection actually work?")
-    st.markdown("<p class='note'>Change a published value and re-verify. If the "
-                "audit trail is worth anything, this must fail.</p>",
-                unsafe_allow_html=True)
+    st.markdown("### Try to fake it")
+    st.markdown("<p class='note'>Change any value below and press re-check. "
+                "If the record could be quietly rewritten after the fact, "
+                "this whole idea would be worthless &mdash; so watch it "
+                "fail.</p>", unsafe_allow_html=True)
     t1, t2, t3 = st.columns([2, 2, 1])
-    FIELD_LABELS = {"Probability of being wrong": "p_wrong_bp",
-                    "Ensemble signal": "signal_bp",
-                    "Trust label": "trust_label"}
-    label = t1.selectbox("Value to alter", list(FIELD_LABELS))
+    FIELD_LABELS = {"Chance it is wrong": "p_wrong_bp",
+                    "Computer runs predicting rain": "signal_bp",
+                    "Our rating": "trust_label"}
+    label = t1.selectbox("Value to change", list(FIELD_LABELS))
     field = FIELD_LABELS[label]
     shown = (record[field] / 100 if field.endswith("_bp") else record[field])
     new_value = t2.text_input("Change it to", value=str(shown))
-    t3.write(""); t3.write("")
-    if t3.button("Re-verify", type="primary"):
+    t3.write("")
+    t3.write("")
+    if t3.button("Re-check", type="primary"):
         tampered = dict(record)
         try:
             tampered[field] = (int(round(float(new_value) * 100))
                                if field.endswith("_bp") else new_value)
         except ValueError:
-            st.error("%s needs a number." % label)
+            st.error("%s needs to be a number." % label)
             return
         bad = verify_record(tampered, entry, outcome)
-        bcolour, btitle, bblurb = STATUS_STYLE.get(bad.status, (MUTED, bad.status.value, ""))
-        st.markdown("<div class='statusbar' style='background:%s'>%s<small>%s</small></div>"
-                    % (bcolour, btitle, bblurb), unsafe_allow_html=True)
+        bcol, btitle, bblurb = STATUS_STYLE.get(
+            bad.status, (MUTED, bad.status.value, ""))
+        st.markdown("<div class='statusbar' style='background:%s'>%s<small>%s"
+                    "</small></div>" % (bcol, btitle, bblurb),
+                    unsafe_allow_html=True)
         if bad.status == Status.MISMATCH:
-            st.success("Detected. The altered record no longer matches the "
-                       "committed hash — exactly what should happen.")
-        st.code("altered   %s\ncommitted %s"
-                % (bad.computed_hash, entry.forecast_hash if entry else "—"),
-                language=None)
+            st.success("Caught. The edited version does not match the locked "
+                       "copy, so the change is detected immediately.")
 
     with st.expander("What this does and does not prove"):
         st.markdown(
-            "**Proves:** this exact record existed, unchanged, before its rain "
-            "window opened.\n\n"
-            "**Does not prove:** that the forecast was any good, or that every "
-            "forecast made was submitted. An owner-controlled registry cannot "
-            "demonstrate the absence of omissions — a public schedule and "
-            "visible gaps reduce that risk without eliminating it.")
+            "**It proves** this exact forecast existed, word for word, "
+            "before the rain was due.\n\n"
+            "**It does not prove** the forecast was any good, or that we "
+            "published every forecast we made. A record store controlled by "
+            "one party cannot show that nothing was quietly left out. "
+            "Publishing a fixed schedule, so that gaps are visible, reduces "
+            "that risk without removing it.")
+
+    with st.expander("Technical detail, for reviewers"):
+        st.code("recomputed SHA-256  %s\nstored SHA-256      %s"
+                % (result.computed_hash or "—", result.registry_hash or "—"),
+                language=None)
+        if entry:
+            st.code("committed      %s\nwindow opens   %s\nwindow closes  %s\n"
+                    "outcome added  %s"
+                    % (entry.committed_utc, entry.window_start_utc,
+                       entry.window_end_utc, entry.outcome_recorded_utc or "—"),
+                    language=None)
 
 
 def page_trust():
-    hero("Trust view",
-         "Every published forecast, its calibrated probability of being "
-         "wrong, and what actually happened.")
+    hero("Every forecast, and what actually happened",
+         "Each row is one warning. We show how many computer runs predicted "
+         "heavy rain, how likely we thought that warning was to be wrong, and "
+         "then what the rain satellites actually recorded afterwards.")
 
     records = load_records()
     if not records:
-        st.warning("No records yet.")
+        st.warning("No forecasts are available yet.")
         return
 
     rows = []
     for fid, rec in records.items():
         o = load_outcome(fid)
         rows.append({
-            "Issued": rec["issue_time_utc"][:10],
-            "Lead": "%d h" % rec["lead_hours"],
-            "Signal %": round(rec["signal_bp"] / 100, 1),
-            "P(wrong) %": round(rec["p_wrong_bp"] / 100, 1),
-            "Trust": rec["trust_label"],
-            "Event?": ("yes" if o["event_occurred"] else "no") if o else "—",
-            "Wrong?": ("yes" if o["decision_was_wrong"] else "no") if o else "—",
+            "Date issued": rec["issue_time_utc"][:10],
+            "Days ahead": rec["lead_hours"] // 24,
+            "Runs predicting rain %": round(rec["signal_bp"] / 100, 1),
+            "Chance it is wrong %": round(rec["p_wrong_bp"] / 100, 1),
+            "Our rating": {"HIGH": "Likely reliable",
+                           "MEDIUM": "Treat with care",
+                           "LOW": "Likely wrong"}.get(rec["trust_label"],
+                                                      rec["trust_label"]),
+            "Did heavy rain come?": ("yes" if o["event_occurred"] else "no")
+                                    if o else "—",
+            "Was the warning wrong?": ("yes" if o["decision_was_wrong"]
+                                       else "no") if o else "—",
         })
-    table = pd.DataFrame(rows).sort_values(["Issued", "Lead"])
+    table = pd.DataFrame(rows).sort_values(["Date issued", "Days ahead"])
 
-    counts = table["Trust"].value_counts()
+    counts = table["Our rating"].value_counts()
     c1, c2, c3, c4 = st.columns(4)
-    card(c1, "Records", str(len(table)), "published and committed")
-    for col, band in ((c2, "HIGH"), (c3, "MEDIUM"), (c4, "LOW")):
-        card(col, "%s trust" % band, str(int(counts.get(band, 0))),
-             "p_wrong %s" % {"HIGH": "< 20%", "MEDIUM": "20–50%", "LOW": "≥ 50%"}[band],
-             TRUST_STYLE[band])
+    card(c1, "Forecasts shown", str(len(table)), "all locked in advance")
+    card(c2, "Likely reliable", str(int(counts.get("Likely reliable", 0))),
+         "we expected these to hold", OK)
+    card(c3, "Treat with care", str(int(counts.get("Treat with care", 0))),
+         "uncertain", WARN)
+    card(c4, "Likely wrong", str(int(counts.get("Likely wrong", 0))),
+         "we expected these to fail", BAD)
 
     st.write("")
     st.dataframe(
         table, width='stretch', hide_index=True,
         column_config={
-            "P(wrong) %": st.column_config.ProgressColumn(
-                "P(wrong) %", min_value=0, max_value=100, format="%.1f%%"),
-            "Signal %": st.column_config.ProgressColumn(
-                "Signal %", min_value=0, max_value=100, format="%.1f%%"),
+            "Chance it is wrong %": st.column_config.ProgressColumn(
+                "Chance it is wrong", min_value=0, max_value=100,
+                format="%.0f%%"),
+            "Runs predicting rain %": st.column_config.ProgressColumn(
+                "Runs predicting rain", min_value=0, max_value=100,
+                format="%.0f%%"),
         })
 
     st.warning(
-        "**The bands are known to be badly positioned.** The cutoffs "
-        "(20% / 50%) were frozen before we knew the false-alarm base rate "
-        "would be ~57%, so a calibrated model essentially never lands in "
-        "HIGH. They are reported as frozen rather than re-tuned after seeing "
-        "results. Read the continuous P(wrong) column, not just the label.")
+        "**These ratings are set at the wrong levels, and we are leaving "
+        "them that way.** We fixed the boundaries between the three ratings "
+        "at the start, before we knew how often warnings actually fail. It "
+        "turns out they fail so often that almost nothing ever earns the top "
+        "rating. Moving the boundaries now, after seeing the answers, would "
+        "make the test meaningless. So we report them as they were set and "
+        "say plainly that they are wrong. Use the percentage column rather "
+        "than the label.")
 
 
 def page_results():
     ev = load_evaluation()
-    hero("Evaluation results",
-         "Can ensemble disagreement tell us when a rainfall forecast is "
-         "about to be wrong? Measured on held-out data, reported honestly.")
+    hero("How well did it do?",
+         "We trained the system on past monsoons, then tested it once on "
+         "weather it had never seen. These are the results of that test, "
+         "including the parts that did not work.")
 
     if ev is None:
-        st.warning("Evaluation results are not available yet.")
+        st.warning("Results are not available yet.")
         return
 
     sp = ev["split"]
-    st.caption("Frozen split — train %s · calibrate %s · test %s"
-               % (", ".join(sp["train"]), ", ".join(sp["calibration"]),
-                  ", ".join(sp["test"])))
+    st.caption("Learned from %s. Tested once on %s."
+               % (", ".join(sp["train"]), ", ".join(sp["test"])))
 
     fa = ev["targets"].get("false_alarm", {}).get("metrics", {}).get("calibrated")
     ms = ev["targets"].get("miss", {}).get("metrics", {}).get("calibrated")
-    c1, c2, c3, c4 = st.columns(4)
+    c1, c2 = st.columns(2)
     if fa:
-        card(c1, "False alarm · skill", "%+.3f" % fa["brier_skill_vs_reference"],
-             "Brier skill vs climatology",
-             OK if fa["brier_skill_vs_reference"] > 0 else BAD)
-        card(c2, "False alarm · AUC", "%.3f" % fa["roc_auc"], "discrimination")
+        card(c1, "Spotting warnings that will fail",
+             "%.0f out of 100" % (100 * fa["roc_auc"]),
+             "how often it ranks a failing warning above a sound one "
+             "(50 would be guesswork)", OK)
     if ms:
-        card(c3, "Miss · skill", "%+.3f" % ms["brier_skill_vs_reference"],
-             "Brier skill vs climatology",
-             OK if ms["brier_skill_vs_reference"] > 0 else BAD)
-        card(c4, "Miss · AUC", "%.3f" % ms["roc_auc"], "discrimination")
+        card(c2, "Spotting rain it failed to warn about",
+             "%.0f out of 100" % (100 * ms["roc_auc"]),
+             "same measure, for missed events", WARN)
+
+    st.markdown("<p class='note'>Both are better than guessing, which means "
+                "the disagreement between computer runs really does carry "
+                "information. Whether that information is <i>usable</i> is a "
+                "separate question, and the charts below are less "
+                "flattering.</p>", unsafe_allow_html=True)
 
     st.write("")
-    t1, t2, t3 = st.tabs(["Skill", "Reliability", "Forecast quality"])
+    t1, t2, t3 = st.tabs(["Were the ratings useful?",
+                          "Were the percentages honest?",
+                          "How good were the original warnings?"])
     with t1:
-        fig("brier_skill.png")
         fig("trust_bands.png")
-        st.markdown("<p class='note'>A positive skill score beats climatology. "
-                    "The uncalibrated bars show why calibration is a separate "
-                    "stage: class weighting buys ranking at the cost of "
-                    "calibrated probabilities.</p>", unsafe_allow_html=True)
+        st.markdown("<p class='note'>Each bar is one rating level, and the "
+                    "height is how often forecasts with that rating turned "
+                    "out wrong. For the ratings to be useful the bars must "
+                    "differ &mdash; and an empty bar means nothing ever got "
+                    "that rating.</p>", unsafe_allow_html=True)
+        fig("brier_skill.png")
+        st.markdown("<p class='note'>Above the line means better than simply "
+                    "assuming every warning behaves like the historical "
+                    "average. Below means worse.</p>",
+                    unsafe_allow_html=True)
     with t2:
         fig("reliability.png")
-        st.markdown("<p class='note'>Points on the diagonal mean the stated "
-                    "probability matches the observed frequency.</p>",
-                    unsafe_allow_html=True)
+        st.markdown("<p class='note'>If we say a warning has a 70% chance of "
+                    "being wrong, then about 70 out of 100 such warnings "
+                    "should indeed be wrong. Points sitting on the diagonal "
+                    "line mean the percentages can be taken at face "
+                    "value.</p>", unsafe_allow_html=True)
     with t3:
         fig("verification_by_signal_level.png")
         verif = ev.get("forecast_verification_test", {})
         if verif:
             st.dataframe(pd.DataFrame([{
-                "Signal level": "%d%%" % (float(k) * 100),
-                "POD": round(v["probability_of_detection"], 3),
-                "FAR": round(v["false_alarm_ratio"], 3),
-                "CSI": round(v["critical_success_index"], 3),
-                "Bias": round(v["frequency_bias"], 3),
+                "How many runs must agree": "%d%%" % (float(k) * 100),
+                "Heavy rain days caught": "%.0f%%" % (100 * v["probability_of_detection"]),
+                "Warnings that failed": "%.0f%%" % (100 * v["false_alarm_ratio"]),
+                "Warnings per real event": "%.1f" % v["frequency_bias"],
             } for k, v in sorted(verif.items(), key=lambda x: float(x[0]))]),
                 width='stretch', hide_index=True)
+            st.markdown("<p class='note'>Demanding more agreement before "
+                        "issuing a warning means fewer false alarms, but also "
+                        "more real downpours missed. There is no setting that "
+                        "avoids both.</p>", unsafe_allow_html=True)
 
-    for target, d in ev["targets"].items():
-        ci = d.get("test_error_rate_ci")
-        if ci:
-            st.caption("%s — observed error rate %.3f, 95%% CI [%.3f, %.3f] "
-                       "(block bootstrap over %d calendar weeks)"
-                       % (target.replace("_", " "), ci["point_estimate"],
-                          ci["ci_low"], ci["ci_high"], ci["n_blocks"]))
+    with st.expander("Technical detail, for reviewers"):
+        rows = []
+        for target, d in ev["targets"].items():
+            for variant, m in d["metrics"].items():
+                rows.append({"target": target, "variant": variant,
+                             "n": m["n"], "positives": m["n_positive"],
+                             "Brier": round(m["brier"], 4),
+                             "Brier skill": round(m["brier_skill_vs_reference"], 4),
+                             "ROC AUC": round(m["roc_auc"], 3) if m["roc_auc"] else None,
+                             "PR AUC": round(m["pr_auc"], 3) if m["pr_auc"] else None})
+        st.dataframe(pd.DataFrame(rows), width='stretch', hide_index=True)
+        for target, d in ev["targets"].items():
+            ci = d.get("test_error_rate_ci")
+            if ci:
+                st.caption("%s — observed error rate %.3f, 95%% CI "
+                           "[%.3f, %.3f] (block bootstrap over %d calendar "
+                           "weeks)" % (target, ci["point_estimate"],
+                                       ci["ci_low"], ci["ci_high"],
+                                       ci["n_blocks"]))
 
-    st.info("Intervals are wide because the test split is short. Comparisons "
-            "between models at this sample size are not statistically "
-            "meaningful. The technical report sets out the full "
-            "limitations.")
+    st.info("**The test covered a single month, so these numbers are not "
+            "settled.** The margins of error are wide enough that small "
+            "differences mean nothing. The technical report explains what "
+            "would be needed to answer the question properly.")
 
 
 def page_region():
-    hero("The region",
-         "Northern Pakistan monsoon belt, 30–37 N / 69–75 E, on the 0.5° "
-         "forecast grid: 15 × 13 = 195 cells.")
+    hero("Where this applies, and why one rule does not fit everywhere",
+         "Northern Pakistan, from the mountains in the north to the plains "
+         "around Lahore. Each square on the map is about 55 km across.")
 
     th = load_thresholds()
     if th is None:
-        st.warning("Regional threshold data is not available yet.")
+        st.warning("Regional information is not available yet.")
         return
 
     c1, c2, c3 = st.columns(3)
-    card(c1, "Cells", "195", "15 lat × 13 lon at 0.5°")
-    card(c2, "Median threshold", "%.1f mm" % th["threshold_mm"].median(),
-         "95th percentile of daily rain")
-    card(c3, "Cells under 1 mm", str(int((th["threshold_mm"] < 1).sum())),
-         "where “extreme” barely means rain", BAD)
+    card(c1, "Areas covered", "195", "squares of about 55 km")
+    card(c2, "Typical bar for heavy rain",
+         "%.0f mm in a day" % th["threshold_mm"].median(), "across the region")
+    card(c3, "Driest areas", "%d squares" % int((th["threshold_mm"] < 1).sum()),
+         "where under 1 mm already counts as unusual", BAD)
 
     st.write("")
-    grid = th.pivot(index="latitude", columns="longitude",
-                    values="threshold_mm").sort_index(ascending=False)
-    st.markdown("**Extreme-rainfall threshold per cell (mm/day)**")
-    st.dataframe(grid.style.background_gradient(cmap="YlGnBu")
-                 .format("{:.1f}"), width='stretch')
+    fig("region_map.png")
+
+    st.markdown("<p class='note'>The system learns, for every square, how "
+                "much rain is genuinely unusual <i>there</i>. Near Lahore "
+                "that is around 30 mm in a day. High in the dry mountains it "
+                "can be under 2 mm. A single national figure would be wrong "
+                "almost everywhere.</p>", unsafe_allow_html=True)
 
     st.warning(
-        "**An open problem.** Thresholds range from %.2f to %.1f mm. In the "
-        "dry north-west (top-left) the 95th percentile falls below 1 mm, so "
-        "“exceeds the threshold” means little more than “any measurable rain "
-        "fell” — and those are exactly the mountain cells where the satellite "
-        "estimate is least reliable. No floor was applied, because changing "
-        "the event definition after seeing results would invalidate the "
-        "protocol. It is recorded as an open issue instead."
-        % (th["threshold_mm"].min(), th["threshold_mm"].max()))
+        "**A problem we have not solved.** In the driest mountain squares the "
+        "bar falls below 1 mm, which means almost any rain at all counts as "
+        "“extreme” there. Those are also the places where rain satellites "
+        "struggle most, because snow and mountains confuse them. We left the "
+        "rule unchanged rather than adjust it after seeing our results, and "
+        "we record it as an open problem instead of hiding it.")
+
+    with st.expander("Technical detail, for reviewers"):
+        grid = th.pivot(index="latitude", columns="longitude",
+                        values="threshold_mm").sort_index(ascending=False)
+        st.caption("Per-cell 95th percentile of daily rainfall, computed on "
+                   "the training months only (mm/day).")
+        st.dataframe(grid.style.background_gradient(cmap="YlGnBu")
+                     .format("{:.1f}"), width='stretch')
 
 
 def page_ledger():
-    hero("Ledger status",
-         "What has been committed, when, and to which registry.")
+    hero("The tamper-proof record",
+         "Every forecast here was sealed with a date stamp before the rain "
+         "was due, and the real rainfall was added only after the day had "
+         "passed. This page lists what is on file.")
 
     reg = registry()
     info = chain_info()
     ids = reg.list_ids()
     if not ids:
-        st.warning("Registry is empty.")
+        st.warning("Nothing has been recorded yet.")
         return
 
-    entries = [reg.get(i) for i in ids]
-    entries = [e for e in entries if e]
+    entries = [e for e in (reg.get(i) for i in ids) if e]
     with_outcome = sum(1 for e in entries if e.outcome_hash)
 
     c1, c2, c3 = st.columns(3)
-    card(c1, "Committed", str(len(entries)), "forecast records")
-    card(c2, "Outcomes attached", str(with_outcome), "windows that have closed", OK)
-    card(c3, "Awaiting outcome", str(len(entries) - with_outcome), "window still open")
+    card(c1, "Forecasts sealed", str(len(entries)), "locked before the rain")
+    card(c2, "Rainfall added", str(with_outcome),
+         "the day has passed and the result is in", OK)
+    card(c3, "Still waiting", str(len(entries) - with_outcome),
+         "the day has not passed yet")
 
     st.write("")
     st.dataframe(pd.DataFrame([{
-        "Forecast id": e.forecast_id,
-        "Committed": e.committed_utc,
-        "Window opens": e.window_start_utc,
-        "Window closes": e.window_end_utc,
-        "Outcome": e.outcome_recorded_utc or "—",
-    } for e in entries]).sort_values("Committed"),
+        "Forecast": e.forecast_id,
+        "Sealed on": e.committed_utc[:10],
+        "Rain due from": e.window_start_utc[:10],
+        "Result added": (e.outcome_recorded_utc or "—")[:10],
+    } for e in entries]).sort_values("Sealed on"),
         width='stretch', hide_index=True)
+
+    archive = load_archive()
+    deployment = load_deployment() or {}
+    published = deployment.get("archive")
+    if archive:
+        st.write("")
+        st.markdown("### One fingerprint for the whole set")
+        st.markdown(
+            "<p class='note'>The forecasts above are a replay of past "
+            "monsoons, so no date stamp made today could prove we spoke "
+            "before the rain &mdash; the rain already fell. What we can "
+            "prove, and have, is that these results have not been edited "
+            "since we published them. Every record is folded into a single "
+            "fingerprint. Change one number anywhere and the fingerprint "
+            "changes, so the results are frozen from that moment on.</p>",
+            unsafe_allow_html=True)
+
+        f1, f2 = st.columns(2)
+        card(f1, "Records covered", str(archive["leaf_count"]),
+             "forecasts and their outcomes")
+        if published:
+            card(f2, "Published", published["published_utc"][:10],
+                 "sealed on a public blockchain", OK)
+        else:
+            card(f2, "Published", "not yet",
+                 "the fingerprint is ready to seal")
+
+        st.code(archive["merkle_root"], language=None)
+        st.caption("Any single record can be checked against this fingerprint "
+                   "on its own, without trusting us and without downloading "
+                   "the rest.")
+
+        if (RECORDS / "archive_manifest.json.ots").exists():
+            st.markdown(
+                "<p class='note'>This fingerprint is also written into the "
+                "<b>Bitcoin blockchain</b>. Bitcoin has no idea what rainfall "
+                "is &mdash; it simply records that this exact fingerprint "
+                "existed at a point in time, and that entry cannot be removed "
+                "or altered by us or by anyone else. Anyone can check it with "
+                "freely available software and no account.</p>",
+                unsafe_allow_html=True)
+
+            anchor = load_bitcoin_anchor()
+            if anchor:
+                st.markdown(
+                    "Written into **Bitcoin block %s** &mdash; "
+                    "[see the block](%s) &middot; "
+                    "[check the proof yourself](%s)"
+                    % (format(anchor["block_height"], ","),
+                       anchor["explorer_url"], anchor["verify_url"]))
+                st.caption(
+                    "The block holds a combined fingerprint covering many "
+                    "unrelated files, not ours by name, which is why this "
+                    "costs nothing. The proof file in the repository supplies "
+                    "the missing link between the two, so checking it needs "
+                    "both.")
+            else:
+                st.caption("Bitcoin confirms in batches, so this takes a few "
+                           "hours to finalise. Until it does, the submission "
+                           "is recorded but not yet set in a block.")
 
     if info is None:
         st.info(
-            "**Local mock registry.** These records were committed with a "
-            "simulated clock set to each forecast's historical issue time, "
-            "because they replay archived forecasts rather than live ones. "
-            "The mock enforces the same rules as the Solidity contract: no "
-            "commit once a window has opened, no outcome before it closes, "
-            "no duplicates, and the timestamp comes from the registry rather "
-            "than the caller.")
-        st.caption("The smart contract implementing these rules passes 24 "
-                   "tests covering every one of them.")
+            "**These are held in a local tamper-proof store.** The forecasts "
+            "replayed here are from past monsoons, so the clock was set to "
+            "the original forecast date. The store applies the same rules as "
+            "the blockchain version: nothing can be sealed once the rain is "
+            "already due, no result can be added before the day has passed, "
+            "and the date stamp is set by the store rather than by us.")
+        st.caption("The blockchain contract that enforces these rules passes "
+                   "24 automated tests covering every one of them.")
     else:
-        st.success("Reading the deployed ForecastRegistry at `%s` on %s "
-                   "(chain %d). Commit timestamps come from the chain."
-                   % (info.address, info.network, info.chain_id))
+        st.success("Reading the live record store at `%s` on %s. The date "
+                   "stamps come from the network itself, not from us."
+                   % (info.address, info.network))
         if info.explorer_url:
-            st.markdown("[View the contract on the block explorer](%s)" % info.explorer_url)
+            st.markdown("[Look it up independently](%s)" % info.explorer_url)
         if not info.is_public:
-            st.warning("This is a **local development chain** — it proves the "
-                       "contract and client work end to end, but a third "
-                       "party cannot independently check it.")
+            st.warning("This is a **test network**. It shows the system "
+                       "works end to end, but an outsider cannot check it "
+                       "independently.")
 
 
 PAGES = {

@@ -318,3 +318,149 @@ describe("ForecastRegistry", function () {
 function anyUint64() {
   return (value) => typeof value === "bigint" && value > 0n;
 }
+
+// --- archives ---------------------------------------------------------------
+//
+// Retrospective results cannot go through `commit`: their rain windows closed
+// years ago, so the contract rightly refuses them, and a timestamp written now
+// could not prove foreknowledge even if it accepted them. `publishArchive`
+// makes the weaker, true claim instead - that this exact set of results
+// existed unaltered at this block - and these tests pin both halves of that
+// separation down.
+
+/** Sorted-pair Merkle, matching the contract and OpenZeppelin's convention. */
+function merkleRoot(leaves) {
+  let level = [...leaves];
+  if (level.length === 0) throw new Error("no leaves");
+  while (level.length > 1) {
+    const next = [];
+    for (let i = 0; i < level.length; i += 2) {
+      // An odd node is carried up unchanged rather than paired with itself,
+      // which is what avoids the duplicate-leaf forgery in the naive scheme.
+      if (i + 1 === level.length) next.push(level[i]);
+      else next.push(hashPair(level[i], level[i + 1]));
+    }
+    level = next;
+  }
+  return level[0];
+}
+
+function hashPair(a, b) {
+  const [lo, hi] = BigInt(a) <= BigInt(b) ? [a, b] : [b, a];
+  return ethers.keccak256(ethers.concat([lo, hi]));
+}
+
+/** Proof for leaves[index], as sibling hashes from the bottom up. */
+function merkleProof(leaves, index) {
+  const proof = [];
+  let level = [...leaves];
+  let i = index;
+  while (level.length > 1) {
+    const next = [];
+    for (let j = 0; j < level.length; j += 2) {
+      if (j + 1 === level.length) {
+        next.push(level[j]);
+      } else {
+        next.push(hashPair(level[j], level[j + 1]));
+        if (j === i || j + 1 === i) proof.push(level[j === i ? j + 1 : j]);
+      }
+    }
+    i = Math.floor(i / 2);
+    level = next;
+  }
+  return proof;
+}
+
+// Thirteen leaves: the real shape of the 2022 replay, and deliberately odd so
+// the carry-up branch is exercised.
+const LEAVES = Array.from({ length: 13 }, (_, i) =>
+  ethers.keccak256(ethers.toUtf8Bytes("PK-NCEP-2022080" + i)));
+
+describe("publishArchive", function () {
+  it("publishes a root and reports it", async function () {
+    const { registry } = await deployFixture();
+    const root = merkleRoot(LEAVES);
+
+    await expect(registry.publishArchive(root, LEAVES.length, "jjas-2022-replay"))
+      .to.emit(registry, "ArchivePublished");
+
+    expect(await registry.archiveCount()).to.equal(1);
+    const a = await registry.archives(0);
+    expect(a.merkleRoot).to.equal(root);
+    expect(a.leafCount).to.equal(LEAVES.length);
+    expect(a.label).to.equal("jjas-2022-replay");
+    expect(a.publishedAt).to.be.greaterThan(0);
+  });
+
+  it("verifies every record in the set against the root", async function () {
+    const { registry } = await deployFixture();
+    const root = merkleRoot(LEAVES);
+    await registry.publishArchive(root, LEAVES.length, "jjas-2022-replay");
+
+    for (let i = 0; i < LEAVES.length; i++) {
+      expect(await registry.verifyArchiveProof(0, LEAVES[i], merkleProof(LEAVES, i)))
+        .to.equal(true, "leaf " + i + " failed its own proof");
+    }
+  });
+
+  it("rejects a record that is not in the set", async function () {
+    const { registry } = await deployFixture();
+    await registry.publishArchive(merkleRoot(LEAVES), LEAVES.length, "set");
+
+    const forged = ethers.keccak256(ethers.toUtf8Bytes("PK-NCEP-NEVER-HAPPENED"));
+    expect(await registry.verifyArchiveProof(0, forged, merkleProof(LEAVES, 0)))
+      .to.equal(false);
+  });
+
+  it("rejects a tampered record under a valid proof", async function () {
+    // The whole point: edit one number in a published record and the leaf
+    // hash changes, so the proof that used to work no longer does.
+    const { registry } = await deployFixture();
+    await registry.publishArchive(merkleRoot(LEAVES), LEAVES.length, "set");
+
+    const tampered = ethers.keccak256(ethers.toUtf8Bytes("PK-NCEP-20220800-edited"));
+    expect(await registry.verifyArchiveProof(0, tampered, merkleProof(LEAVES, 0)))
+      .to.equal(false);
+  });
+
+  it("refuses an empty root, an empty set and an empty label", async function () {
+    const { registry } = await deployFixture();
+    await expect(registry.publishArchive(ZERO_HASH, 1, "x"))
+      .to.be.revertedWithCustomError(registry, "EmptyHash");
+    await expect(registry.publishArchive(merkleRoot(LEAVES), 0, "x"))
+      .to.be.revertedWithCustomError(registry, "EmptyArchive");
+    await expect(registry.publishArchive(merkleRoot(LEAVES), 1, ""))
+      .to.be.revertedWithCustomError(registry, "EmptyLabel");
+  });
+
+  it("refuses the same root twice", async function () {
+    const { registry } = await deployFixture();
+    const root = merkleRoot(LEAVES);
+    await registry.publishArchive(root, LEAVES.length, "first");
+    await expect(registry.publishArchive(root, LEAVES.length, "second"))
+      .to.be.revertedWithCustomError(registry, "DuplicateArchiveRoot");
+  });
+
+  it("refuses a non-owner", async function () {
+    const { registry, stranger } = await deployFixture();
+    await expect(
+      registry.connect(stranger)
+        .publishArchive(merkleRoot(LEAVES), LEAVES.length, "x"))
+      .to.be.revertedWithCustomError(registry, "NotOwner");
+  });
+
+  it("reverts on an out-of-range archive index", async function () {
+    const { registry } = await deployFixture();
+    await expect(registry.verifyArchiveProof(0, LEAVES[0], []))
+      .to.be.revertedWithCustomError(registry, "IndexOutOfRange");
+  });
+
+  it("does not let an archive stand in for a commitment", async function () {
+    // An archived record must still be absent from the forecast log, so the
+    // verifier can never read a retrospective result as a pre-commitment.
+    const { registry } = await deployFixture();
+    await registry.publishArchive(merkleRoot(LEAVES), LEAVES.length, "replay");
+    expect(await registry.exists("PK-NCEP-20220800")).to.equal(false);
+    expect(await registry.count()).to.equal(0);
+  });
+});

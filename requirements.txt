@@ -30,6 +30,10 @@ requests==2.34.2
 # Imported lazily inside ChainRegistry, so the app still runs without a chain;
 # pinned here so the on-chain registry page works where one is configured.
 web3==8.0.0
+# Anchors the archive fingerprint in Bitcoin at no cost, via public calendar
+# servers (CLAUDE.md 10.4). Needed only to create or check the .ots proof;
+# the proof file itself is verifiable with any OpenTimestamps client.
+opentimestamps-client==0.7.2
 
 # --- modelling ---
 scikit-learn==1.9.1

@@ -69,7 +69,10 @@ value with its date recorded. Decide and record that before any live commit.
 ## 2026-10-16 — IMERG downloader does not reuse the GES DISC generated script
 
 **Decision.** `scripts/download_imerg.py` is written against `earthaccess`
-rather than adapting `download_files_GPM_3IMERGDF_07.py`.
+rather than adapting the script GES DISC generates from its own subsetting
+form (`download_files_GPM_3IMERGDF_07.py`, since deleted: it was never used,
+and keeping a downloader that points at the wrong region invites someone to
+run it).
 
 **Reason.** The generated script's bounding box is
 `37.1,23.7,60.9,77.8`, which CMR reads as west,south,east,north — a box from
