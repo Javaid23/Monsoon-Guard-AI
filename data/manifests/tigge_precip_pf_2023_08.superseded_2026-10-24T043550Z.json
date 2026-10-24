@@ -1,0 +1,90 @@
+{
+  "completed_utc": "2026-10-17T18:30:35Z",
+  "created_utc": "2026-10-17T14:31:38Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "expected_days": 31,
+  "files": [],
+  "forecast_type": "perturbed_forecast",
+  "issues": [
+    {
+      "detail": "404 Client Error: Not Found for url: https://ecds.ecmwf.int/api/retrieve/v1/jobs/e44553a6-6d1d-497b-9698-9b194ca25a83?log=True&request=True\njob not found\njob e44553a6-6d1d-497b-9698-9b194ca25a83 deleted",
+      "kind": "retrieve_failed",
+      "logged_utc": "2026-10-17T18:30:35Z"
+    }
+  ],
+  "manifest_id": "tigge_precip_pf_2023_08",
+  "product": "TIGGE ncep",
+  "request_parameters": {
+    "area": [
+      37.0,
+      69.0,
+      30.0,
+      75.0
+    ],
+    "data_format": "grib",
+    "day": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30",
+      "31"
+    ],
+    "forecast_type": "perturbed_forecast",
+    "leadtime_hour": [
+      "24",
+      "48",
+      "72"
+    ],
+    "level_type": "single_level",
+    "month": "08",
+    "origin": "ncep",
+    "time": "00:00",
+    "variable": [
+      "total_precipitation"
+    ],
+    "year": "2023"
+  },
+  "requested_members": 30,
+  "source": "ECMWF Data Store (ecds.ecmwf.int)",
+  "steps_h": [
+    24,
+    48,
+    72
+  ],
+  "summary": {
+    "n_files": 0,
+    "n_issues": 1,
+    "total_bytes": 0,
+    "total_mb": 0.0
+  },
+  "version": "tigge-forecasts"
+}

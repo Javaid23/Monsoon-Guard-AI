@@ -1,7 +1,13 @@
-# Data (never committed; rebuildable from manifests + scripts)
-data/
+# Data (never committed; rebuildable from manifests + scripts).
+# Exclude the CONTENTS of data/, not the directory itself: git cannot
+# re-include a file whose parent directory is excluded, so "data/" here
+# would silently swallow the manifests we do want committed.
+data/*
 !data/manifests/
+data/manifests/*
 !data/manifests/*.json
+# Job-store state is local scheduling bookkeeping, not a dataset manifest.
+data/manifests/tigge_jobs.json
 
 # Secrets
 .env

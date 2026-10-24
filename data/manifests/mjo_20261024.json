@@ -1,0 +1,47 @@
+{
+  "completed_utc": "2026-10-24T07:04:39Z",
+  "created_utc": "2026-10-24T07:04:37Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "files": [
+    {
+      "downloaded_utc": "2026-10-24T07:04:39Z",
+      "file_name": "rmm.74toRealtime_20261024.txt",
+      "index": "rmm",
+      "relative_path": "data/raw/mjo/rmm.74toRealtime_20261024.txt",
+      "sha256": "4e5757c7104ca3063a051bb6fa8f7ffd56e81a01bcc3b67c0fe4bf720761af11",
+      "size_bytes": 2597997,
+      "source_url": "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+    }
+  ],
+  "issues": [
+    {
+      "detail": "122 of 488 required JJAS days are missing (first 2024-06-01, last 2024-09-30)",
+      "kind": "rmm_coverage_gap",
+      "logged_utc": "2026-10-24T07:04:39Z",
+      "n_missing_days": 122
+    }
+  ],
+  "manifest_id": "mjo_20261024",
+  "product": "mjo_indices",
+  "request_parameters": {
+    "omi_url": "https://psl.noaa.gov/mjo/mjoindex/omi.1x.txt",
+    "rmm_url": "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+  },
+  "rmm_first_date": "1974-06-01",
+  "rmm_last_date": "2024-02-24",
+  "rmm_missing_values": 290,
+  "rmm_rows": 18166,
+  "rmm_season_days_present": 366,
+  "rmm_season_days_required": 488,
+  "source": "BoM (RMM) and NOAA PSL (OMI)",
+  "summary": {
+    "n_files": 1,
+    "n_issues": 1,
+    "total_bytes": 2597997,
+    "total_mb": 2.6
+  },
+  "version": "20261024"
+}

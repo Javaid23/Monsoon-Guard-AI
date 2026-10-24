@@ -1,0 +1,100 @@
+{
+  "completed_utc": "2026-10-16T22:14:31Z",
+  "created_utc": "2026-10-16T22:07:48Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "expected_days": 31,
+  "files": [
+    {
+      "downloaded_utc": "2026-10-16T22:14:31Z",
+      "file_name": "precip_pf_2022_08.grib",
+      "relative_path": "data/raw/tigge_ncep/precip_pf_2022_08.grib",
+      "retrieve_seconds": 403.6,
+      "sha256": "efd2ebc7ba758f8e8f44f8f12d1b3f3b2233752ee80a2e1db85dc49d76a491ba",
+      "size_bytes": 1528920
+    }
+  ],
+  "forecast_type": "perturbed_forecast",
+  "issues": [
+    {
+      "detail": "member count, step ranges and grid resolution not yet verified against the file contents",
+      "kind": "pending_verification",
+      "logged_utc": "2026-10-16T22:14:31Z"
+    }
+  ],
+  "manifest_id": "tigge_precip_pf_2022_08",
+  "product": "TIGGE ncep",
+  "request_parameters": {
+    "area": [
+      37.0,
+      69.0,
+      30.0,
+      75.0
+    ],
+    "data_format": "grib",
+    "day": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30",
+      "31"
+    ],
+    "forecast_type": "perturbed_forecast",
+    "leadtime_hour": [
+      "24",
+      "48",
+      "72"
+    ],
+    "level_type": "single_level",
+    "month": "08",
+    "origin": "ncep",
+    "time": "00:00",
+    "variable": [
+      "total_precipitation"
+    ],
+    "year": "2022"
+  },
+  "requested_members": 30,
+  "source": "ECMWF Data Store (ecds.ecmwf.int)",
+  "steps_h": [
+    24,
+    48,
+    72
+  ],
+  "summary": {
+    "n_files": 1,
+    "n_issues": 1,
+    "total_bytes": 1528920,
+    "total_mb": 1.53
+  },
+  "supersedes": "tigge_precip_pf_2022_08.superseded_2026-10-16T221431Z.json",
+  "version": "tigge-forecasts"
+}

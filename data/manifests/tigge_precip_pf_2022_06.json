@@ -1,0 +1,98 @@
+{
+  "completed_utc": "2026-10-17T09:54:21Z",
+  "created_utc": "2026-10-17T09:45:39Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "expected_days": 30,
+  "files": [
+    {
+      "downloaded_utc": "2026-10-17T09:54:21Z",
+      "file_name": "precip_pf_2022_06.grib",
+      "relative_path": "data/raw/tigge_ncep/precip_pf_2022_06.grib",
+      "retrieve_seconds": 521.8,
+      "sha256": "dbf3f65c01832d8809a56798a6fb70a6650e917fb3a40d2533857c84ee598f88",
+      "size_bytes": 1474128
+    }
+  ],
+  "forecast_type": "perturbed_forecast",
+  "issues": [
+    {
+      "detail": "member count, step ranges and grid resolution not yet verified against the file contents",
+      "kind": "pending_verification",
+      "logged_utc": "2026-10-17T09:54:21Z"
+    }
+  ],
+  "manifest_id": "tigge_precip_pf_2022_06",
+  "product": "TIGGE ncep",
+  "request_parameters": {
+    "area": [
+      37.0,
+      69.0,
+      30.0,
+      75.0
+    ],
+    "data_format": "grib",
+    "day": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30"
+    ],
+    "forecast_type": "perturbed_forecast",
+    "leadtime_hour": [
+      "24",
+      "48",
+      "72"
+    ],
+    "level_type": "single_level",
+    "month": "06",
+    "origin": "ncep",
+    "time": "00:00",
+    "variable": [
+      "total_precipitation"
+    ],
+    "year": "2022"
+  },
+  "requested_members": 30,
+  "source": "ECMWF Data Store (ecds.ecmwf.int)",
+  "steps_h": [
+    24,
+    48,
+    72
+  ],
+  "summary": {
+    "n_files": 1,
+    "n_issues": 1,
+    "total_bytes": 1474128,
+    "total_mb": 1.47
+  },
+  "version": "tigge-forecasts"
+}

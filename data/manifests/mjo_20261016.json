@@ -1,0 +1,63 @@
+{
+  "completed_utc": "2026-10-16T19:20:32Z",
+  "created_utc": "2026-10-16T19:19:49Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "files": [
+    {
+      "downloaded_utc": "2026-10-16T19:20:04Z",
+      "file_name": "rmm.74toRealtime_20261016.txt",
+      "index": "rmm",
+      "relative_path": "data/raw/mjo/rmm.74toRealtime_20261016.txt",
+      "sha256": "4e5757c7104ca3063a051bb6fa8f7ffd56e81a01bcc3b67c0fe4bf720761af11",
+      "size_bytes": 2597997,
+      "source_url": "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+    },
+    {
+      "downloaded_utc": "2026-10-16T19:20:32Z",
+      "file_name": "omi_20261016.txt",
+      "index": "omi",
+      "relative_path": "data/raw/mjo/omi_20261016.txt",
+      "sha256": "52b5d504eb5933b638ace34fde813fc4be5194f1a05156a0879e536eb13d1b49",
+      "size_bytes": 452893,
+      "source_url": "https://psl.noaa.gov/mjo/mjoindex/omi.1x.txt"
+    }
+  ],
+  "issues": [
+    {
+      "detail": "244 of 610 required JJAS days are missing (first 2024-06-01, last 2025-09-30)",
+      "kind": "rmm_coverage_gap",
+      "logged_utc": "2026-10-16T19:20:04Z",
+      "n_missing_days": 244
+    }
+  ],
+  "manifest_id": "mjo_20261016",
+  "omi_first_date": "1991-01-01",
+  "omi_last_date": "2026-06-24",
+  "omi_missing_values": 0,
+  "omi_rows": 12959,
+  "omi_season_days_present": 610,
+  "omi_season_days_required": 610,
+  "product": "mjo_indices",
+  "request_parameters": {
+    "omi_url": "https://psl.noaa.gov/mjo/mjoindex/omi.1x.txt",
+    "rmm_url": "http://www.bom.gov.au/climate/mjo/graphics/rmm.74toRealtime.txt"
+  },
+  "rmm_first_date": "1974-06-01",
+  "rmm_last_date": "2024-02-24",
+  "rmm_missing_values": 290,
+  "rmm_rows": 18166,
+  "rmm_season_days_present": 366,
+  "rmm_season_days_required": 610,
+  "source": "BoM (RMM) and NOAA PSL (OMI)",
+  "summary": {
+    "n_files": 2,
+    "n_issues": 1,
+    "total_bytes": 3050890,
+    "total_mb": 3.05
+  },
+  "supersedes": "mjo_20261016.superseded_2026-10-16T192032Z.json",
+  "version": "20261016"
+}
