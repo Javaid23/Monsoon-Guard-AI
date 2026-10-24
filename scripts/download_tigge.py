@@ -230,6 +230,9 @@ def planned_work(cfg, months, groups, selected, types_arg):
     for group_name in selected:
         for fc_type in forecast_types(cfg, types_arg, group_name):
             for month in months:
+                if (group_name in ATMOSPHERIC
+                        and atmospheric_covered_by_gefs(cfg, month)):
+                    continue
                 plan.append((
                     work_priority(group_name, fc_type, month, complete_years),
                     group_name, groups[group_name], fc_type, month,
@@ -240,6 +243,24 @@ def planned_work(cfg, months, groups, selected, types_arg):
 
 
 # --- submit -----------------------------------------------------------------
+
+def atmospheric_covered_by_gefs(cfg, month) -> bool:
+    """Is this month's atmospheric context already held from NOAA GEFS?
+
+    ECDS slots are the scarce resource - four at most, one running at a time -
+    so re-requesting fields we already have from another source would spend
+    them on nothing. The GEFS files carry all nine context fields of
+    CLAUDE.md 7.2 on the identical evaluation grid (docs/decisions.md,
+    2026-10-24), so a month covered there needs no TIGGE surface or
+    pressure request at all.
+    """
+    try:
+        gefs_dir = cfg.get_path("raw_gefs_atmos")
+    except Exception:
+        gefs_dir = cfg.get_path("raw_tigge").parent / "gefs_atmos"
+    path = gefs_dir / ("atmos_cf_%d_%02d.nc" % (month.year, month.month))
+    return path.exists() and path.stat().st_size > 0
+
 
 def outstanding_work(cfg, store, months, selected, types, groups):
     """Every target still needing a file, with the request that would fill it.

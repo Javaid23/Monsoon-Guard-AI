@@ -2,8 +2,8 @@
 """Build the label table: thresholds, signals and the two error targets.
 
 Reads the raw IMERG and TIGGE archives, regrids observations onto the 0.5
-degree forecast grid, computes per-cell thresholds from the training years
-only, and writes one row per (issue date, lead day, cell).
+degree forecast grid, computes per-cell thresholds from the train-split
+months only, and writes one row per (issue date, lead day, cell).
 
 Outputs
     data/interim/obs_on_forecast_grid.nc    observations, 0.5 degree
@@ -29,7 +29,7 @@ import numpy as np
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.core import align, io_imerg, io_tigge, labels  # noqa: E402
-from src.core.config import load_config  # noqa: E402
+from src.core.config import load_config, split_months  # noqa: E402
 from src.core.manifest import setup_logging, utc_now_iso  # noqa: E402
 
 
@@ -80,19 +80,21 @@ def main() -> int:
     obs_fc.to_netcdf(interim, engine="h5netcdf")
     logger.info("wrote %s", interim)
 
-    # --- thresholds (training years only) -----------------------------------
+    # --- thresholds (train-split months only) -----------------------------------
     th = labels.compute_thresholds(obs_fc, cfg,
                                    percentile=args.threshold_percentile)
     for line in th.report().splitlines():
         logger.info("%s", line)
 
-    forbidden = (set(cfg["split"]["calibration_years"])
-                 | set(cfg["split"]["test_years"]))
-    leaked = forbidden & set(th.years_used)
+    # The split is month level; comparing years here would be both broken
+    # (those keys no longer exist) and too coarse to catch a within-year leak.
+    forbidden = set(split_months(cfg, "calibration")) | set(split_months(cfg, "test"))
+    leaked = forbidden & set(th.months_used)
     if leaked:
-        logger.error("LEAKAGE: thresholds used non-training years %s", sorted(leaked))
+        logger.error("LEAKAGE: thresholds used calibration/test months %s",
+                     sorted(leaked))
         return 1
-    logger.info("leakage check passed: thresholds use only %s", th.years_used)
+    logger.info("leakage check passed: thresholds use only %s", th.months_used)
 
     low = int((th.values.values < 1.0).sum())
     if low:
@@ -151,6 +153,7 @@ def main() -> int:
         "rows": len(table),
         "threshold_percentile": th.percentile,
         "threshold_years": th.years_used,
+        "threshold_months": th.months_used,
         "threshold_days": th.n_days_used,
         "signal_fraction": table.attrs["signal_fraction"],
         "forecast_months": months,

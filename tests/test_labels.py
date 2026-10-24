@@ -269,3 +269,17 @@ def test_base_rates_are_internally_consistent(cfg):
     assert 0.0 <= r["event_rate"] <= 1.0
     assert r["n_false_alarm"] <= r["n_signal"]
     assert r["n_miss"] <= r["n_quiet"]
+
+
+def test_duplicate_observation_dates_are_refused_not_silently_resolved(cfg):
+    """Two rows for one date would resolve to whichever came last, quietly
+    changing every label for that day. The build must refuse."""
+    times = pd.DatetimeIndex(["2022-08-01", "2022-08-01", "2022-08-02"])
+    obs = xr.DataArray(np.ones((3, len(LAT), len(LON))),
+                       dims=("time", "latitude", "longitude"),
+                       coords={"time": times, "latitude": LAT, "longitude": LON})
+    th = compute_thresholds(obs, cfg, months=["2022-08"])
+    fc = _forecast(pd.DatetimeIndex(["2022-08-01"]))
+
+    with pytest.raises(ValueError, match="duplicate date"):
+        build_label_table(fc, obs, th, cfg)

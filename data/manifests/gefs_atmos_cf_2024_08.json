@@ -1,0 +1,78 @@
+{
+  "completed_utc": "2026-10-24T11:45:39Z",
+  "created_utc": "2026-10-24T11:45:39Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "files": [
+    {
+      "downloaded_utc": "2026-10-24T11:45:39Z",
+      "file_name": "atmos_cf_2024_08.nc",
+      "relative_path": "data/raw/gefs_atmos/atmos_cf_2024_08.nc",
+      "sha256": "d3ff954051f24472c7e7d77fa5eed25e7b939632a12acf7927b3602e99478ab2",
+      "size_bytes": 671009
+    }
+  ],
+  "issue_dates": 31,
+  "issues": [
+    {
+      "detail": "total_column_water is GEFS PWAT (precipitable water): vapour column only, whereas TIGGE total column water includes cloud condensate",
+      "kind": "variable_substitution",
+      "logged_utc": "2026-10-24T11:45:39Z"
+    },
+    {
+      "detail": "operational GEFS rather than the TIGGE archive copy; same centre (NCEP), same 0.5 deg grid, same 00 UTC initialisation",
+      "kind": "source_substitution",
+      "logged_utc": "2026-10-24T11:45:39Z"
+    }
+  ],
+  "manifest_id": "gefs_atmos_cf_2024_08",
+  "product": "GEFS control forecast, atmospheric context",
+  "request_parameters": {
+    "access": "HTTP Range requests guided by .idx sidecars",
+    "area_nwse": [
+      37.0,
+      69.0,
+      30.0,
+      75.0
+    ],
+    "control_member": "gec00",
+    "fields": [
+      "total_column_water",
+      "convective_available_potential_energy",
+      "convective_inhibition",
+      "mean_sea_level_pressure",
+      "10_m_u_component_of_wind",
+      "10_m_v_component_of_wind",
+      "u_component_of_wind_850",
+      "v_component_of_wind_850",
+      "specific_humidity_850"
+    ],
+    "grib_fields": [
+      "PWAT @ entire atmosphere (considered as a single layer)",
+      "CAPE @ 180-0 mb above ground",
+      "CIN @ 180-0 mb above ground",
+      "PRMSL @ mean sea level",
+      "UGRD @ 10 m above ground",
+      "VGRD @ 10 m above ground",
+      "UGRD @ 850 mb",
+      "VGRD @ 850 mb",
+      "SPFH @ 850 mb"
+    ],
+    "steps_h": [
+      24,
+      48,
+      72
+    ]
+  },
+  "source": "NOAA Open Data (s3://noaa-gefs-pds), anonymous HTTPS",
+  "substitutes": "TIGGE NCEP surface + pressure_level groups",
+  "summary": {
+    "n_files": 1,
+    "n_issues": 2,
+    "total_bytes": 671009,
+    "total_mb": 0.67
+  },
+  "version": "operational GEFS v12, pgrb2a/pgrb2b 0p50"
+}

@@ -10,7 +10,10 @@ try {
 }
 
 const AMOY_RPC_URL =
-  process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";
+  process.env.AMOY_RPC_URL ||
+  // polygon.technology's own endpoint does not resolve on some
+  // networks; publicnode is a working public alternative.
+  "https://polygon-amoy-bor-rpc.publicnode.com";
 const DEPLOYER_PRIVATE_KEY = process.env.DEPLOYER_PRIVATE_KEY || "";
 
 /** @type import('hardhat/config').HardhatUserConfig */

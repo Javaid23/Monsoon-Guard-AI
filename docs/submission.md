@@ -70,26 +70,31 @@ the audit trail.
 
 ## What we found
 
-Honest results on held-out data:
+We ran two evaluations. The gap between them is the finding.
 
-| Error model | Brier skill vs climatology | ROC AUC |
+| | In-regime (test 2022-08/09) | Held-out year (test 2024-06) |
 |---|---|---|
-| **False alarm** | **+0.29** | 0.735 |
-| **Miss** | +0.012 | 0.702 |
+| False alarm, Brier skill | **+0.29** | +0.54\* |
+| False alarm, ROC AUC | 0.735 | 0.740 |
+| Miss, Brier skill | +0.012 | **-0.009** |
+| Trust bands | MEDIUM 25% vs LOW 62% | **all in one band** |
 
-**Ensemble spread genuinely predicts false alarms.** On the test split the
-underlying forecast detects 74% of extreme events but 57% of its warnings
-never verify. Our false-alarm model separates those: cells it labels LOW trust
-fail 62% of the time, against 25% for MEDIUM — a 2.5× separation, capturing
-94% of all false alarms.
+\*The +0.54 is **not** an improvement: with a 96.5% base rate,
+climatology is already strong and relative skill inflates. The honest
+row is the last one - on a held-out year every test sample landed in a
+single trust band, so the labels carry no information.
 
-**It does not predict misses well.** The model ranks missed events above
-chance, but converting that into calibrated probabilities adds essentially
-nothing over quoting the base rate. We report that as a negative result rather
-than hiding it.
+**We found out why, and it is not the model.** Discrimination barely
+moved (0.735 to 0.740). The event threshold is a per-cell percentile of
+the whole JJAS training period, dominated by wet July-September. Applied
+to a dry June it gives a frequency bias of 11.3 and a false alarm ratio
+of 0.965. The event *definition* does not travel across seasonal
+regimes - a specific, testable diagnosis with an obvious next experiment
+(month-conditioned thresholds), not a vague "needs more data".
 
-**Calibration mattered far more than expected.** The uncalibrated miss model
-scored a Brier skill of **−4.86** — dramatically worse than climatology —
+**Calibration mattered far more than expected.** Uncalibrated, the miss
+model scored a Brier skill of **−4.86** in-regime (and −9.01 on the held-out
+year) — dramatically worse than climatology —
 because class weighting buys ranking at the cost of calibrated probabilities.
 Isotonic calibration, fitted only on the calibration split, moved it to
 +0.012 with a calibration error of 0.0055.
@@ -110,7 +115,8 @@ Isotonic calibration, fitted only on the calibration split, moved it to
 - **Audit:** canonical JSON with floats rejected outright (probabilities in
   basis points) so hashes reproduce across platforms.
 
-**147 tests**, including leakage checks that multiply every test-year
+**163 Python tests and 24 Solidity contract tests**, including leakage
+checks that multiply every test-year
 observation by 1000 and assert the thresholds come back bit-identical, and
 tamper tests that confirm altering any field breaks verification.
 
@@ -153,8 +159,9 @@ it, when in fact it ranked perfectly well.
 
 ## Limitations we want to be upfront about
 
-- The test set is **two months inside a single season**, not an independent
-  season. No cross-season generalisation is demonstrated.
+- The held-out test is a **single month** (June 2024), so "does not
+  generalise" rests on one month - and the driest in the record relative
+  to its threshold, which may make it unusually harsh.
 - Those two months are **August–September 2022, the flood period** — the most
   extreme data in the archive, deliberately not representative.
 - Confidence intervals are wide (false-alarm error rate 0.57, 95% CI
@@ -165,8 +172,9 @@ it, when in fact it ranked perfectly well.
   alarms, because 0.20/0.50 cutoffs were frozen before we knew the base error
   rate would be 57%. We report them as frozen rather than re-tuning after
   seeing results.
-- A testnet contract was written but not deployed; the mock registry
-  implements and enforces the same rules.
+- The contract is deployed and working on a **local** chain, with a real
+  commit and tamper detection verified against it, but **not on a public
+  testnet** — so nobody outside can independently check it.
 
 The blockchain proves a record existed unchanged before its window opened. It
 does not prove the forecast was good, and an owner-controlled registry cannot
@@ -220,7 +228,8 @@ ECMWF Data Store API · Streamlit · Solidity · Hardhat
 ## Try it
 
 ```bash
-pytest -q                                   # 147 tests
+pytest -q                                   # 163 tests
+npx hardhat test                            # 24 contract tests
 streamlit run src/app/streamlit_app.py      # verification page
 ```
 

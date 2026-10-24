@@ -2,12 +2,13 @@
 """Provisional baseline run: features + model ladder on whatever TIGGE
 precipitation months are currently on disk.
 
-THIS IS NOT THE CLAUDE.md SECTION 8 EVALUATION. The frozen protocol needs the
-calibration year (2024) and test year (2025), which are not fully downloaded
-yet. This script exists to validate the full pipeline end to end and get
-honest, real (not fabricated) provisional numbers while the rest of the
-archive downloads, using leave-one-month-out cross-validation across whatever
-training-year months are present.
+THIS IS NOT THE CLAUDE.md SECTION 8 EVALUATION. It exists to validate the
+pipeline end to end and get honest provisional numbers while the archive is
+still downloading, using leave-one-month-out cross-validation over whatever
+TRAIN-split months are on disk.
+
+It refuses to run once any calibration or test month has been downloaded, so
+it cannot be mistaken for, or quietly substituted for, the frozen protocol.
 
 Re-running this script after more months land will automatically use the
 larger set; nothing here is hard-coded to a fixed number of months.
@@ -24,7 +25,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from src.core import align, features, io_imerg, io_tigge, labels, models  # noqa: E402
-from src.core.config import load_config  # noqa: E402
+from src.core.config import load_config, split_months  # noqa: E402
 from src.core.manifest import setup_logging  # noqa: E402
 
 
@@ -37,9 +38,8 @@ def main() -> int:
     cfg = load_config()
     logger = setup_logging("provisional_baseline")
     logger.warning("PROVISIONAL RUN - not the CLAUDE.md section 8 evaluation. "
-                   "Uses leave-one-month-out CV on training-year months only; "
-                   "calibration (2024) and test (2025) years are not yet "
-                   "downloaded.")
+                   "Leave-one-month-out CV over train-split months only. "
+                   "Refuses to run once calibration or test data exists.")
 
     # --- data actually on disk right now ------------------------------------
     import numpy as np
@@ -61,22 +61,27 @@ def main() -> int:
 
     forecast, qcs = io_tigge.load(cfg, "precip", "pf")
     months_present = sorted({str(t)[:7] for t in forecast["time"].values})
-    train_years = set(cfg["split"]["train_years"])
-    cal_test_years = set(cfg["split"]["calibration_years"] + cfg["split"]["test_years"])
-    present_years = {int(m[:4]) for m in months_present}
-    if present_years & cal_test_years:
-        logger.error("calibration/test year data is present (%s) - this "
-                     "script must not be used once those years exist; use "
-                     "the frozen evaluation protocol instead",
-                     sorted(present_years & cal_test_years))
+    train_m = set(split_months(cfg, "train"))
+    forbidden = set(split_months(cfg, "calibration")) | set(split_months(cfg, "test"))
+    present = set(months_present)
+    if present & forbidden:
+        logger.error("calibration/test month data is present (%s) - this "
+                     "script must not be used once it exists; use the frozen "
+                     "evaluation protocol instead", sorted(present & forbidden))
         return 1
-    logger.info("months used (all within training years %s): %s",
-                sorted(train_years), months_present)
+    if not present & train_m:
+        logger.error("none of the downloaded months (%s) are in the train "
+                     "split (%s) - nothing to do", months_present,
+                     sorted(train_m))
+        return 1
+    logger.info("months used (all within the train split): %s",
+                sorted(present & train_m))
 
     # --- thresholds, labels, features ---------------------------------------
-    th = labels.compute_thresholds(obs_fc, cfg, years=sorted(present_years))
-    logger.info("thresholds computed from years %s only (%d days)",
-                th.years_used, th.n_days_used)
+    th = labels.compute_thresholds(obs_fc, cfg,
+                                   months=sorted(present & train_m))
+    logger.info("thresholds computed from months %s only (%d days)",
+                th.months_used, th.n_days_used)
 
     table = labels.build_label_table(forecast, obs_fc, th, cfg)
     rates = labels.base_rates(table)

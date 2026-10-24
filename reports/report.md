@@ -19,13 +19,22 @@ tamper-evident record of each forecast and its trust label before the rain
 window opens, so the claim "we said this in advance" can be checked rather
 than trusted.
 
-**Headline finding.** For the false-alarm case the answer is yes: a model
-using ensemble spread and related features reaches a Brier skill score of
-**+0.29** over climatology and ROC AUC **0.735** on held-out data. For the
-miss case the answer is largely no: discrimination is real (ROC AUC
-**0.702**) but the skill score is **+0.012**, essentially indistinguishable
-from climatology. Both results come from a test set far smaller than designed,
-for reasons set out in Section 6.
+**Headline finding, in two parts.**
+
+*Within the same seasonal regime*, yes. Trained on 2021-2022 and tested on
+August-September 2022, the false-alarm model reaches Brier skill **+0.29**
+over climatology with ROC AUC **0.735**, and its trust bands separate error
+rates by 2.5x. Ensemble spread genuinely carries information about which
+warnings will fail.
+
+*Across seasons, largely no.* Tested on a genuinely held-out year
+(June 2024, three seasons after training), discrimination survives
+(ROC AUC **0.740**) but the method stops being useful: every sample lands in
+a single trust band, and the miss model falls to Brier skill **-0.009**,
+marginally worse than climatology.
+
+The gap between those two results is the most informative thing in this
+report, and Section 4.4 is about why.
 
 ---
 
@@ -118,7 +127,15 @@ Section 4.2.
 
 ## 4. Results
 
-### 4.1 Forecast verification (test split)
+**Sections 4.1 to 4.3 report the in-regime evaluation** (train 2021,
+calibrate 2022-06/07, test 2022-08/09). **Section 4.4 reports the held-out
+year** (train 2021-2022, calibrate 2023-06, test 2024-06) and compares the
+two. Both were run once on their own test set; both are kept because the
+difference between them is the finding. Raw output for each is in
+`reports/evaluation_results_2022split.json` and
+`reports/evaluation_results_2024split.json`.
+
+### 4.1 Forecast verification (in-regime test split)
 
 How good is the underlying forecast, independent of our models:
 
@@ -205,7 +222,68 @@ error distribution rather than fixed in advance at round numbers. Changing
 them now, after seeing test results, would invalidate the protocol, so they
 are reported as frozen and their inadequacy recorded as a finding.
 
-### 4.4 Uncertainty
+### 4.4 The generalisation test, and why it matters most
+
+Two evaluations were run. The second was only possible once `pf_2024_06`
+arrived, and it tests the thing the first could not.
+
+| | **In-regime** | **Held-out year** |
+|---|---|---|
+| train | 2021 JJAS (122 d) | 2021+2022 JJAS (244 d) |
+| calibrate | 2022-06/07 | 2023-06 |
+| **test** | **2022-08/09** (35,685) | **2024-06** (17,550) |
+| false alarm: Brier skill | **+0.293** | **+0.544** |
+| false alarm: ROC AUC | 0.735 | 0.740 |
+| miss: Brier skill | +0.012 | **-0.009** |
+| miss: ROC AUC | 0.702 | 0.645 |
+| trust bands | MEDIUM 24.8% vs LOW 62.1% | **all 2,619 in one band** |
+
+**The +0.544 is not an improvement.** It is easier to beat climatology when
+the base rate is extreme: 96.5% of signal=1 samples in June 2024 were false
+alarms, so the reference Brier is already tiny (0.0746) and a modest
+absolute gain becomes a large relative one. Read it alongside the band table,
+which is the honest summary: **the trust labels carry no information at all
+on the held-out year**, because every sample is LOW.
+
+**What went wrong is structural, not a coding error.** June is a different
+rainfall regime from the season the thresholds were built on:
+
+| Period | Event rate vs train p95 | Mean rainfall |
+|---|---|---|
+| Training JJAS 2021-22 | 5.33% | — |
+| June only, training years | 3.14% | 1.42 mm |
+| July-September, training years | 6.04% | 2.67 mm |
+| **Test: June 2024** | **1.25%** | — |
+
+Thresholds are the per-cell 95th percentile of the *whole* JJAS training
+period, which is dominated by the wet July-September months. Applied to a dry
+June, those thresholds are rarely exceeded by observations but still often
+exceeded by at least 20% of ensemble members. The result is a frequency bias
+of **11.3** — the forecast signals roughly eleven times more events than
+occur — and a false alarm ratio of **0.965**, against 1.70 and 0.566
+respectively in the in-regime test.
+
+So the honest conclusion is narrower than the in-regime numbers suggest:
+
+> Ensemble disagreement predicts forecast error **within the seasonal regime
+> the thresholds were calibrated on**. It does not, as implemented here,
+> transfer to monsoon onset — and the cause appears to be the
+> season-aggregated threshold definition rather than the error model itself,
+> since discrimination (ROC AUC 0.740) barely moves while calibration and
+> band utility collapse.
+
+That is a testable claim. A month-of-year or onset-aware threshold is the
+obvious next experiment, and Section 7 lists it.
+
+**Caveats on this conclusion.** The held-out test is a *single* month, so
+"does not transfer" rests on one June. It is also the driest month in the
+record relative to its threshold, which may make it an unusually harsh test.
+A fair assessment needs full seasons for 2023 and 2024, which the archive did
+not deliver in time.
+
+---
+
+### 4.5 Uncertainty
 
 Test error rates with 95% confidence intervals from a **block bootstrap by
 calendar week** (resampling whole weeks, not rows, because neighbouring cells
@@ -251,9 +329,18 @@ the model was sensible, or that every forecast made was submitted. An
 owner-controlled registry cannot demonstrate the absence of omissions; a
 public schedule and visible gaps reduce that risk without eliminating it.
 
-A deployed testnet contract was not reached. The mock registry implements the
-same interface and the same rules, and is what the tests and demo records run
-against.
+The contract is deployed and exercised on a **local development chain**
+(chain 31337): a real transaction, a real commit whose timestamp comes from
+the chain rather than the caller, and tamper detection confirmed against it.
+A Python client (`src/audit/chain_client.py`) reads and writes the deployed
+contract over JSON-RPC.
+
+**No public testnet deployment was reached**, so a third party cannot
+independently check any of this - a local chain is reproducible but not
+externally verifiable, and the app labels it as such rather than implying
+otherwise. The archived 2022 records remain on the mock registry, and must:
+the contract correctly refuses any commit once a window has opened, so
+historical forecasts cannot be committed live. That is the rule working.
 
 ---
 
@@ -263,7 +350,7 @@ These are substantial and should be read before any result above.
 
 **The test set is one season fragment, not an independent season.** The
 design called for training on 2021–2023, calibrating on 2024 and testing on
-2025. ECMWF's archive delivered 19 of 40 requested files over eight days and
+2025. ECMWF's archive delivered 20 of 40 requested files over nine days and
 **nothing at all for 2024 or 2025**; individual requests ranged from 0.8
 minutes to 15.9 hours against a shared global tape queue. With a fixed
 deadline the split was re-frozen — before any test result was examined — onto
@@ -364,10 +451,13 @@ error model of this kind, and the method here is not specific to NCEP.
 
 In rough order of value:
 
-1. **Obtain 2024 and 2025** and run the original split. This is the single
-   change that would turn a fragment into a real evaluation. The code already
-   supports it; only the data is missing.
-2. **Download the atmospheric groups** (control forecast only is sufficient
+1. **Month-conditioned or onset-aware thresholds.** Section 4.4 shows the
+   season-aggregated 95th percentile is what breaks on a June test set. A
+   threshold computed per calendar month, or relative to onset, is a direct
+   test of that diagnosis and costs no new data.
+2. **Obtain full 2023 and 2024 seasons** and re-run. One June is too thin to
+   conclude the method does not generalise; full seasons would settle it.
+3. **Download the atmospheric groups** (control forecast only is sufficient
    and costs roughly 1/30th of the full ensemble) and run the planned
    ablation.
 3. **Derive trust band cutoffs from the error distribution** on a calibration
@@ -390,7 +480,8 @@ python scripts/download_tigge.py --all --group precip   # slow: tape archive
 python scripts/build_labels.py
 python scripts/run_evaluation.py
 python scripts/build_records.py
-pytest -q                     # 147 tests
+pytest -q                     # 163 Python tests
+npx hardhat test              # 24 contract tests
 ```
 
 Every decision taken, including the ones that departed from the original
@@ -402,13 +493,24 @@ SHA-256 checksums are in `data/manifests/`.
 ## 9. Honest summary
 
 The pipeline is sound and independently validated against pre-specified
-acceptance figures. The false-alarm model shows real skill (+0.29 Brier skill
-score, ROC AUC 0.735). The miss model discriminates but adds negligible skill
-(+0.012). Trust bands separate error rates by 2.5–3.7× but are badly
-positioned, with one band empty.
+acceptance figures, and the audit layer does what it claims.
 
-These results rest on a test set of two months inside a single, exceptional
-season, with no demonstrated cross-season generalisation and without the
-atmospheric features that a central part of the research question depended on.
-The methodology is ready to produce a trustworthy answer; the data to do so
-was not obtainable in the time available.
+The scientific answer is conditional. **Within the seasonal regime the
+thresholds were built on**, ensemble disagreement predicts forecast error
+usefully: Brier skill +0.29, ROC AUC 0.735, and trust bands that separate
+error rates 2.5-fold. **On a held-out year**, discrimination survives
+(ROC AUC 0.740) but utility does not: every test sample falls in one trust
+band and the miss model drops marginally below climatology.
+
+The most useful thing we learned is *why*. The event threshold is a per-cell
+percentile of the whole JJAS training period, dominated by the wet
+July-September months. Applied to a dry June it produces a frequency bias of
+11.3 and a false alarm ratio of 0.965. The error model is not obviously at
+fault - its ranking ability barely changes - but the event definition does
+not travel across seasonal regimes, and nothing downstream can repair that.
+
+So: a method that works where it was calibrated, a clear and testable
+explanation for where it stops working, and an obvious next experiment
+(onset-aware or month-conditioned thresholds). What is missing is the data to
+settle it - full 2023 and 2024 seasons, and the atmospheric features for the
+ablation - none of which the archive delivered in time.

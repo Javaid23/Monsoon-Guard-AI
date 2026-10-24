@@ -172,7 +172,23 @@ def build_label_table(forecast: xr.DataArray, obs: xr.DataArray,
     fraction = member_fraction_over(forecast, thresholds)
     signal = forecast_signal(fraction, cfg, signal_fraction)
 
-    obs_dates = {d.date(): i for i, d in enumerate(pd.to_datetime(obs["time"].values))}
+    # A duplicate observation date would silently resolve to whichever row
+    # came last, quietly changing every label for that day. Refuse instead
+    # (CLAUDE.md section 2.12: report data problems, never absorb them).
+    obs_index = pd.to_datetime(obs["time"].values)
+    obs_dates: dict = {}
+    duplicates: list[str] = []
+    for i, d in enumerate(obs_index):
+        day = d.date()
+        if day in obs_dates:
+            duplicates.append(day.isoformat())
+        obs_dates[day] = i
+    if duplicates:
+        raise ValueError(
+            "observations contain %d duplicate date(s), e.g. %s. Labels "
+            "cannot be built from an ambiguous archive - deduplicate the "
+            "IMERG files first."
+            % (len(duplicates), ", ".join(sorted(set(duplicates))[:5])))
     lats = forecast["latitude"].values
     lons = forecast["longitude"].values
     issue_dates = pd.to_datetime(forecast["time"].values)

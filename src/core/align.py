@@ -111,8 +111,22 @@ def regrid_to_forecast(obs: xr.DataArray, target_lat, target_lon,
     w_lon = build_weights(obs["lon"].values, target_lon, half)
 
     values = obs.values.astype("float64")
-    # Contract the two trailing axes: (..., lat, lon) -> (..., LAT, LON)
-    out = np.einsum("il,...lm,jm->...ij", w_lat, values, w_lon)
+
+    # NaN-aware weighted average. A plain contraction would be wrong: zero
+    # weights do not exclude a NaN, because 0 * NaN is NaN, so one missing
+    # observation anywhere would propagate through the whole contraction and
+    # turn EVERY output cell into NaN. Instead, treat missing values as
+    # absent and renormalise by the weight that actually contributed.
+    missing = ~np.isfinite(values)
+    if missing.any():
+        present = np.where(missing, 0.0, values)
+        valid = (~missing).astype("float64")
+        weighted = np.einsum("il,...lm,jm->...ij", w_lat, present, w_lon)
+        coverage = np.einsum("il,...lm,jm->...ij", w_lat, valid, w_lon)
+        with np.errstate(invalid="ignore", divide="ignore"):
+            out = np.where(coverage > 0, weighted / coverage, np.nan)
+    else:
+        out = np.einsum("il,...lm,jm->...ij", w_lat, values, w_lon)
 
     dims = list(obs.dims[:-2]) + ["latitude", "longitude"]
     coords = {d: obs.coords[d].values for d in obs.dims[:-2] if d in obs.coords}

@@ -1,0 +1,398 @@
+{
+  "calibrator": "isotonic",
+  "features": [
+    "ens_mean",
+    "ens_std",
+    "ens_max",
+    "ens_std_norm",
+    "ens_frac_over_threshold",
+    "ens_frac_over_half_threshold",
+    "ens_q25",
+    "ens_q50",
+    "ens_q75",
+    "ens_q90",
+    "neigh_mean",
+    "neigh_max",
+    "lead_day",
+    "latitude",
+    "longitude",
+    "omi_pc1",
+    "omi_pc2",
+    "omi_amplitude"
+  ],
+  "forecast_verification_by_lead": {
+    "1": {
+      "correct_negatives": 5012,
+      "critical_success_index": 0.04295942720763723,
+      "false_alarm_ratio": 0.9550561797752809,
+      "false_alarms": 765,
+      "frequency_bias": 10.972602739726028,
+      "hits": 36,
+      "miss_rate": 0.5068493150684932,
+      "misses": 37,
+      "n": 5850,
+      "probability_of_detection": 0.4931506849315068
+    },
+    "2": {
+      "correct_negatives": 4906,
+      "critical_success_index": 0.02754237288135593,
+      "false_alarm_ratio": 0.9708193041526375,
+      "false_alarms": 865,
+      "frequency_bias": 11.278481012658228,
+      "hits": 26,
+      "miss_rate": 0.6708860759493671,
+      "misses": 53,
+      "n": 5850,
+      "probability_of_detection": 0.3291139240506329
+    },
+    "3": {
+      "correct_negatives": 4872,
+      "critical_success_index": 0.02965235173824131,
+      "false_alarm_ratio": 0.9687162891046386,
+      "false_alarms": 898,
+      "frequency_bias": 11.5875,
+      "hits": 29,
+      "miss_rate": 0.6375,
+      "misses": 51,
+      "n": 5850,
+      "probability_of_detection": 0.3625
+    }
+  },
+  "forecast_verification_test": {
+    "0.1": {
+      "correct_negatives": 14358,
+      "critical_success_index": 0.03508771929824561,
+      "false_alarm_ratio": 0.9635416666666666,
+      "false_alarms": 2960,
+      "frequency_bias": 13.241379310344827,
+      "hits": 112,
+      "miss_rate": 0.5172413793103449,
+      "misses": 120,
+      "n": 17550,
+      "probability_of_detection": 0.4827586206896552
+    },
+    "0.2": {
+      "correct_negatives": 14790,
+      "critical_success_index": 0.03297101449275362,
+      "false_alarm_ratio": 0.965253913707522,
+      "false_alarms": 2528,
+      "frequency_bias": 11.288793103448276,
+      "hits": 91,
+      "miss_rate": 0.6077586206896551,
+      "misses": 141,
+      "n": 17550,
+      "probability_of_detection": 0.3922413793103448
+    },
+    "0.3": {
+      "correct_negatives": 15074,
+      "critical_success_index": 0.030290791599353797,
+      "false_alarm_ratio": 0.9676584734799483,
+      "false_alarms": 2244,
+      "frequency_bias": 9.995689655172415,
+      "hits": 75,
+      "miss_rate": 0.6767241379310345,
+      "misses": 157,
+      "n": 17550,
+      "probability_of_detection": 0.3232758620689655
+    },
+    "0.5": {
+      "correct_negatives": 15453,
+      "critical_success_index": 0.030519790176442536,
+      "false_alarm_ratio": 0.966822187662001,
+      "false_alarms": 1865,
+      "frequency_bias": 8.314655172413794,
+      "hits": 64,
+      "miss_rate": 0.7241379310344828,
+      "misses": 168,
+      "n": 17550,
+      "probability_of_detection": 0.27586206896551724
+    }
+  },
+  "model": "logistic",
+  "run_utc": "2026-10-24T14:11:51Z",
+  "seed": 20260101,
+  "split": {
+    "calibration": [
+      "2023-06"
+    ],
+    "test": [
+      "2024-06"
+    ],
+    "train": [
+      "2021-06",
+      "2021-07",
+      "2021-08",
+      "2021-09",
+      "2022-06",
+      "2022-07",
+      "2022-08",
+      "2022-09"
+    ]
+  },
+  "targets": {
+    "false_alarm": {
+      "calibrator_kind": "isotonic",
+      "metrics": {
+        "calibrated": {
+          "brier": 0.034044591758681735,
+          "brier_skill_vs_reference": 0.5436709013180164,
+          "n": 2619,
+          "n_positive": 2528,
+          "pr_auc": 0.9844433265504258,
+          "roc_auc": 0.7399673111698426
+        },
+        "reference": {
+          "brier": 0.07460534920304844,
+          "brier_skill_vs_reference": 0.0,
+          "n": 2619,
+          "n_positive": 2528,
+          "pr_auc": 0.965253913707522,
+          "roc_auc": 0.5
+        },
+        "uncalibrated": {
+          "brier": 0.12935562681977075,
+          "brier_skill_vs_reference": -0.7338653086082623,
+          "n": 2619,
+          "n_positive": 2528,
+          "pr_auc": 0.9890147757340159,
+          "roc_auc": 0.7523647238837111
+        }
+      },
+      "n_calibration": 1525,
+      "n_positive_test": 2528,
+      "n_positive_train": 13794,
+      "n_test": 2619,
+      "n_train": 18088,
+      "reliability": {
+        "bins": [
+          {
+            "bin": 0,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 1,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 2,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 3,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 4,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 5,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 6,
+            "mean_predicted": 0.6666666666666666,
+            "n": 1,
+            "observed_frequency": 0.0
+          },
+          {
+            "bin": 7,
+            "mean_predicted": 0.75,
+            "n": 1,
+            "observed_frequency": 1.0
+          },
+          {
+            "bin": 8,
+            "mean_predicted": 0.871098981688361,
+            "n": 929,
+            "observed_frequency": 0.9289558665231432
+          },
+          {
+            "bin": 9,
+            "mean_predicted": 0.9715980658447388,
+            "n": 1688,
+            "observed_frequency": 0.985781990521327
+          }
+        ],
+        "expected_calibration_error": 0.030014577140992798,
+        "n_bins": 10
+      },
+      "test_error_rate_ci": {
+        "alpha": 0.05,
+        "ci_high": 0.9867744305657604,
+        "ci_low": 0.9455468389478542,
+        "n_blocks": 6,
+        "n_resamples": 1000,
+        "point_estimate": 0.965253913707522
+      },
+      "train_base_rate": 0.7626050710678101,
+      "trust_bands": {
+        "HIGH": {
+          "error_rate": NaN,
+          "n": 0,
+          "n_errors": 0,
+          "share_of_all_errors": 0.0,
+          "share_of_samples": 0.0
+        },
+        "LOW": {
+          "error_rate": 0.965253913707522,
+          "n": 2619,
+          "n_errors": 2528,
+          "share_of_all_errors": 1.0,
+          "share_of_samples": 1.0
+        },
+        "MEDIUM": {
+          "error_rate": NaN,
+          "n": 0,
+          "n_errors": 0,
+          "share_of_all_errors": 0.0,
+          "share_of_samples": 0.0
+        }
+      }
+    },
+    "miss": {
+      "calibrator_kind": "isotonic",
+      "metrics": {
+        "calibrated": {
+          "brier": 0.00974298730883221,
+          "brier_skill_vs_reference": -0.009420647743098254,
+          "n": 14931,
+          "n_positive": 141,
+          "pr_auc": 0.01530593232456436,
+          "roc_auc": 0.6452172015786015
+        },
+        "reference": {
+          "brier": 0.009652058664161425,
+          "brier_skill_vs_reference": 0.0,
+          "n": 14931,
+          "n_positive": 141,
+          "pr_auc": 0.009443439823186659,
+          "roc_auc": 0.5
+        },
+        "uncalibrated": {
+          "brier": 0.09665343591714742,
+          "brier_skill_vs_reference": -9.013763828024217,
+          "n": 14931,
+          "n_positive": 141,
+          "pr_auc": 0.015920681973878224,
+          "roc_auc": 0.655148437462537
+        }
+      },
+      "n_calibration": 16025,
+      "n_positive_test": 141,
+      "n_positive_train": 3297,
+      "n_test": 14931,
+      "n_train": 123482,
+      "reliability": {
+        "bins": [
+          {
+            "bin": 0,
+            "mean_predicted": 0.020376336469129536,
+            "n": 14780,
+            "observed_frequency": 0.009539918809201624
+          },
+          {
+            "bin": 1,
+            "mean_predicted": 0.12645004055955683,
+            "n": 151,
+            "observed_frequency": 0.0
+          },
+          {
+            "bin": 2,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 3,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 4,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 5,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 6,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 7,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 8,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          },
+          {
+            "bin": 9,
+            "mean_predicted": null,
+            "n": 0,
+            "observed_frequency": null
+          }
+        ],
+        "expected_calibration_error": 0.012005639886024221,
+        "n_bins": 10
+      },
+      "test_error_rate_ci": {
+        "alpha": 0.05,
+        "ci_high": 0.01599568655643422,
+        "ci_low": 0.004678452784653887,
+        "n_blocks": 6,
+        "n_resamples": 1000,
+        "point_estimate": 0.009443439823186659
+      },
+      "train_base_rate": 0.026700247079133987,
+      "trust_bands": {
+        "HIGH": {
+          "error_rate": 0.009443439823186659,
+          "n": 14931,
+          "n_errors": 141,
+          "share_of_all_errors": 1.0,
+          "share_of_samples": 1.0
+        },
+        "LOW": {
+          "error_rate": NaN,
+          "n": 0,
+          "n_errors": 0,
+          "share_of_all_errors": 0.0,
+          "share_of_samples": 0.0
+        },
+        "MEDIUM": {
+          "error_rate": NaN,
+          "n": 0,
+          "n_errors": 0,
+          "share_of_all_errors": 0.0,
+          "share_of_samples": 0.0
+        }
+      }
+    }
+  }
+}

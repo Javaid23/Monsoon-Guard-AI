@@ -111,10 +111,11 @@ Click re-verify. Let the red MISMATCH sit on screen for a beat.
 
 **On screen:** terminal, `pytest -q` finishing, or the repo.
 
-> "147 tests, including leakage checks that multiply every test-year
+> "163 Python tests plus 24 contract tests, including leakage checks
+> that multiply every test-year
 > observation by a thousand and assert the thresholds don't move."
 
-> "The honest limitation: ECMWF's tape archive gave us 19 of 40 files in
+> "The honest limitation: ECMWF's tape archive gave us 20 of 40 files in
 > eight days and nothing for the years we'd planned to test on, so our test
 > set is two months inside one exceptional season. The method is ready; the
 > data wasn't obtainable in time."

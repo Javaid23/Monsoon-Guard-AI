@@ -44,3 +44,8 @@ Thumbs.db
 node_modules/
 contracts/artifacts/
 contracts/.cache/
+
+# Deployment record is local state: it names whichever chain was last
+# deployed to. Shipping one that points at 127.0.0.1 would imply a
+# deployment a reader cannot reach. Commit it only for a public network.
+records/registry_deployment.json

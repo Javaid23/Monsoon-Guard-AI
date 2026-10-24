@@ -179,3 +179,52 @@ def test_claude_md_phase1_imerg_area_mean(cfg):
     assert out.shape == (15, 13)
     assert not np.isnan(out.values).any()
     assert float(out.mean()) == pytest.approx(7.2, abs=0.05)
+
+
+# --- NaN handling (regression: a single missing cell once destroyed the grid)
+
+def test_one_missing_observation_does_not_poison_the_whole_grid(cfg):
+    """Zero weights do not exclude a NaN, because 0 * NaN is NaN. A plain
+    contraction therefore turned every one of the 195 output cells into NaN
+    when a single input cell was missing. The averaging must be NaN-aware."""
+    lat = np.arange(29.75, 37.2501, 0.1)
+    lon = np.arange(68.75, 75.2501, 0.1)
+    data = np.ones((len(lat), len(lon)))
+    data[0, 0] = np.nan
+    obs = xr.DataArray(data, dims=("lat", "lon"),
+                       coords={"lat": lat, "lon": lon})
+
+    out = regrid_to_forecast(obs, np.arange(37.0, 29.99, -0.5),
+                             np.arange(69.0, 75.01, 0.5), cfg)
+    assert not np.isnan(out.values).any()
+    # The box containing the gap still averages its remaining cells to 1.0.
+    assert np.allclose(out.values, 1.0)
+
+
+def test_a_fully_missing_box_reports_nan_rather_than_inventing_a_value(cfg):
+    lat = np.arange(29.75, 37.2501, 0.1)
+    lon = np.arange(68.75, 75.2501, 0.1)
+    data = np.ones((len(lat), len(lon)))
+    data[0:6, 0:6] = np.nan          # covers one 0.5 deg box entirely
+    obs = xr.DataArray(data, dims=("lat", "lon"),
+                       coords={"lat": lat, "lon": lon})
+
+    out = regrid_to_forecast(obs, np.arange(37.0, 29.99, -0.5),
+                             np.arange(69.0, 75.01, 0.5), cfg)
+    assert int(np.isnan(out.values).sum()) == 1
+
+
+def test_partial_coverage_averages_only_the_present_cells(cfg):
+    """A box half full of 2.0 and half missing must average to 2.0, not 1.0:
+    missing cells are absent, not zero."""
+    lat = np.arange(29.75, 37.2501, 0.1)
+    lon = np.arange(68.75, 75.2501, 0.1)
+    data = np.full((len(lat), len(lon)), 2.0)
+    data[0:3, :] = np.nan
+    obs = xr.DataArray(data, dims=("lat", "lon"),
+                       coords={"lat": lat, "lon": lon})
+
+    out = regrid_to_forecast(obs, np.arange(37.0, 29.99, -0.5),
+                             np.arange(69.0, 75.01, 0.5), cfg)
+    finite = out.values[np.isfinite(out.values)]
+    assert np.allclose(finite, 2.0)

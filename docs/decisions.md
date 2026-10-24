@@ -617,3 +617,125 @@ submission. `python scripts/download_tigge.py status` reports coverage. If a
 month is still missing at the cutoff, the fallback is to drop the test year to
 2023 and calibrate on a held-out block of 2022, recorded here before any test
 result is viewed.
+
+## 2026-10-24 — Atmospheric context fields come from NOAA GEFS, not TIGGE
+
+**Decision.** The atmospheric context fields of CLAUDE.md 7.2 — total column
+water, CAPE, CIN, mean sea level pressure, 10 m wind, and 850 hPa u, v and
+specific humidity — are taken from NOAA's open GEFS archive
+(`s3://noaa-gefs-pds`, control run `gec00`, `pgrb2a`/`pgrb2b` at 0.5 degrees),
+not from TIGGE. The precipitation ensemble stays on TIGGE, so every ensemble,
+spread and member-fraction feature keeps its original source.
+
+**Reason.** ECDS delivered **0 of 16 months for both** the `surface` and
+`pressure_level` groups, and by 2026-10-24 had completed no job of any kind
+for over six hours while holding four of our requests in `accepted` with none
+promoted to `running`. This matches behaviour documented on the ECMWF forum:
+only one TIGGE job per account runs during heavy usage, others sit in
+`accepted` indefinitely, and jobs can hang beyond 24 hours. Without these
+fields the section 7.3 ablation — "baseline plus spread and atmospheric
+features", the arm that actually answers the research question — cannot run at
+all.
+
+NOAA publishes the same model. TIGGE's "NCEP" ensemble *is* NCEP's GEFS, so
+this is the same centre, the same 0.5 degree grid and the same 00 UTC
+initialisation, with no queue, no account and no credentials.
+
+**Verification.** The fetched fields were checked against a TIGGE file already
+on disk: the grid matches **exactly** — 15 x 13, latitudes descending
+37.00 to 30.00, longitudes 69.00 to 75.00 — so the data drops onto the
+evaluation grid with no regridding. All nine variables are present for every
+issue date with zero missing values, and every value is physically plausible
+(PWAT 1-82 mm, CAPE 0-2413 J/kg, CIN -686 to 0.5 J/kg, MSLP 98.8-102.8 kPa,
+850 hPa q 0.0015-0.0247 kg/kg).
+
+**Two substitutions that must appear in the report.**
+
+1. `total_column_water` is GEFS **PWAT** (precipitable water), which is the
+   water-vapour column only. TIGGE's total column water also includes cloud
+   condensate. Close, but not the same quantity.
+2. These are **operational GEFS** fields rather than the TIGGE archive copy of
+   them. GEFS v12 has been operational since September 2020, so 2021-2024 is
+   one consistent model version, but it is not byte-identical to what TIGGE
+   would have returned.
+
+**Mixed provenance, stated plainly.** Precipitation (labels, ensemble spread,
+member fractions) comes from TIGGE NCEP; atmospheric context comes from NOAA
+GEFS. Both are NCEP GEFS at 0.5 degrees from the same initialisation, so the
+features are physically consistent, but the report must not describe the
+dataset as purely TIGGE.
+
+**Mechanics.** GEFS files are global and 50-100 MB each, and S3 offers no
+server-side subsetting, so `scripts/download_gefs_atmos.py` reads each file's
+`.idx` sidecar and fetches single fields by HTTP Range request (a few hundred
+KB), cropping to the region locally. Fetches run in parallel; decoding is
+serialised behind a lock because ecCodes is not thread-safe — decoding from
+several threads killed the process natively with no Python traceback.
+
+**Result.** JJAS 2021 took 3.5 minutes for 4 months with zero failures,
+against six hours and zero files from ECDS. Scope chosen with the user:
+2021-2022 only, because the precipitation for those two seasons is already
+complete, so adding atmospheric context finishes them outright and makes the
+full ablation possible on a complete two-season dataset.
+
+**The ECDS queue is left running** for the 2023/2024 precipitation months. If
+it recovers, those seasons become usable too; if not, 2021-2022 is the dataset
+and the split reverts to the earlier two-season design recorded above.
+
+---
+
+## 2026-10-24 (later) — Split re-frozen again: test on a held-out YEAR
+
+**Recorded BEFORE running the evaluation and before any 2024 result was seen.**
+
+**Decision.** The active split becomes:
+
+| Split | Months | Days |
+|---|---|---|
+| train | 2021-06..09, 2022-06..09 | 244 |
+| calibration | 2023-06 | 30 |
+| test | **2024-06** | 30 |
+
+**Reason.** Earlier today the split was re-frozen onto 2022 because nothing
+beyond 2023-06 existed. Since then `pf_2024_06` arrived. That single month
+changes what is scientifically demonstrable: the test set is now a year
+**three seasons after the training data**, rather than two months adjacent to
+it.
+
+The previous arrangement could not show cross-season generalisation at all -
+Section 6 of the report said so explicitly, and it was the single biggest
+weakness in the work. A held-out year addresses exactly that, and training
+data doubles from 122 to 244 days as a side effect.
+
+**This is a second use of a test set, and that must be disclosed.**
+CLAUDE.md section 8.1 says the test set is used once. An evaluation was
+already run on a 2022-08/09 test set earlier today. The move is not motivated
+by disliking that result (it was good: Brier skill +0.29 on false alarms);
+it is motivated by data arriving that makes a stronger design possible.
+Critically, **2024-06 has never been touched by any model or any choice** -
+it is a genuinely fresh test set, used once.
+
+Both results stay in the report. The 2024-06 evaluation is reported as
+primary; the 2022 evaluation is reported alongside it as the earlier run on a
+weaker split, with the reason for the change. Deleting the first run and
+presenting only the second would be the dishonest option.
+
+**What is given up.**
+
+- The test set halves, from 61 days to 30 (35,685 to 17,550 samples), so
+  confidence intervals widen further.
+- The calibration set is a single month. Isotonic regression is kept as the
+  frozen choice rather than switched to Platt after the fact; 2023-06 still
+  provides thousands of rows per conditional subset, which is adequate,
+  but it is temporally narrow.
+- **June is monsoon onset, not peak.** The test month is a different rainfall
+  regime from the August-September period the earlier split tested, and from
+  much of the training data. A model tuned to peak-monsoon behaviour may
+  transfer poorly, and if it does, that is a real finding rather than a flaw
+  in the design.
+- Still only one test month, so this shows generalisation to *a* later
+  season, not across several.
+
+**Unchanged:** thresholds from train months only, calibration fitted on the
+calibration split only, chronological ordering asserted in config, and the
+leakage checks.

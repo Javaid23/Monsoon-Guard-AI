@@ -123,8 +123,8 @@ split:
   # coverage, and docs/decisions.md records the fallback if they do not.
   train_months: ["2021-06", "2021-07", "2021-08", "2021-09",
                  "2022-06", "2022-07", "2022-08", "2022-09"]
-  calibration_months: ["2023-06", "2023-07", "2023-08", "2023-09"]
-  test_months: ["2024-06", "2024-07", "2024-08", "2024-09"]
+  calibration_months: ["2023-06"]
+  test_months: ["2024-06"]
 
   # August 2022 now sits inside the training years, so it cannot be used as a
   # held-out case study under the active split. It is evaluated by a separate
@@ -141,6 +141,12 @@ paths:
   raw_tigge: data/raw/tigge_ncep
   raw_imerg: data/raw/imerg_final
   raw_mjo: data/raw/mjo
+  # Atmospheric context fields from NOAA's open GEFS archive, used because
+  # ECDS never delivered the TIGGE surface or pressure_level groups
+  # (0 of 16 months for either). Same centre, same 0.5 deg grid, same 00 UTC
+  # init; written on the identical 15x13 evaluation grid. See docs/decisions.md
+  # 2026-10-24 "Atmospheric context fields come from NOAA GEFS, not TIGGE".
+  raw_gefs_atmos: data/raw/gefs_atmos
   interim: data/interim
   processed: data/processed
   manifests: data/manifests

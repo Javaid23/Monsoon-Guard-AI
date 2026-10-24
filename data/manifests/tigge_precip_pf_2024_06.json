@@ -1,0 +1,122 @@
+{
+  "adopted_job": true,
+  "completed_utc": "2026-10-24T11:20:18Z",
+  "created_utc": "2026-10-24T11:20:18Z",
+  "ecds_job_id": "980031b9-68ce-4e4b-8e90-1842762faea6",
+  "ecds_queue_seconds": 18327.0,
+  "ecds_submitted_utc": "2026-10-24T06:14:51Z",
+  "environment": {
+    "platform": "Windows-10-10.0.18363-SP0",
+    "python": "3.11.4"
+  },
+  "files": [
+    {
+      "downloaded_utc": "2026-10-24T11:20:18Z",
+      "file_name": "precip_pf_2024_06.grib",
+      "relative_path": "data/raw/tigge_ncep/precip_pf_2024_06.grib",
+      "sha256": "7196b8479c4dc569c83ce1a7187481c7772dda6a5b7f4238bb4ec87b5b42ff1c",
+      "size_bytes": 1479600
+    }
+  ],
+  "forecast_type": "perturbed_forecast",
+  "issues": [
+    {
+      "detail": "job was submitted by an earlier interrupted run; its request parameters were inferred from submission logs and then confirmed against the file contents",
+      "kind": "adopted_job",
+      "logged_utc": "2026-10-24T11:20:18Z"
+    },
+    {
+      "detail": "5603 negative step differences clipped to zero (rounding in the accumulated field)",
+      "kind": "negative_differences_clipped",
+      "logged_utc": "2026-10-24T11:20:18Z"
+    }
+  ],
+  "manifest_id": "tigge_precip_pf_2024_06",
+  "product": "TIGGE ncep",
+  "request_parameters": {
+    "area": [
+      37.0,
+      69.0,
+      30.0,
+      75.0
+    ],
+    "data_format": "grib",
+    "day": [
+      "01",
+      "02",
+      "03",
+      "04",
+      "05",
+      "06",
+      "07",
+      "08",
+      "09",
+      "10",
+      "11",
+      "12",
+      "13",
+      "14",
+      "15",
+      "16",
+      "17",
+      "18",
+      "19",
+      "20",
+      "21",
+      "22",
+      "23",
+      "24",
+      "25",
+      "26",
+      "27",
+      "28",
+      "29",
+      "30"
+    ],
+    "forecast_type": "perturbed_forecast",
+    "leadtime_hour": [
+      "24",
+      "48",
+      "72"
+    ],
+    "level_type": "single_level",
+    "month": "06",
+    "origin": "ncep",
+    "time": "00:00",
+    "variable": [
+      "total_precipitation"
+    ],
+    "year": "2024"
+  },
+  "requested_members": 30,
+  "source": "ECMWF Data Store (ecds.ecmwf.int)",
+  "steps_h": [
+    24,
+    48,
+    72
+  ],
+  "summary": {
+    "n_files": 1,
+    "n_issues": 2,
+    "total_bytes": 1479600,
+    "total_mb": 1.48
+  },
+  "verification": {
+    "grid": [
+      15,
+      13
+    ],
+    "months_in_file": [
+      6
+    ],
+    "n_issue_dates": 30,
+    "n_members": 30,
+    "n_negative_clipped": 5603,
+    "value_max_mm": 59.094,
+    "verified": true,
+    "years_in_file": [
+      2024
+    ]
+  },
+  "version": "tigge-forecasts"
+}

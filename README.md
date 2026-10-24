@@ -18,15 +18,18 @@ decision made and why.
 
 Can ensemble spread tell us when a forecast will be wrong?
 
-| Error model | Brier skill vs climatology | ROC AUC | Verdict |
-|---|---|---|---|
-| **False alarm** | **+0.29** | 0.735 | real skill |
-| **Miss** | +0.012 | 0.702 | discriminates, but adds ~nothing |
+| | In-regime (test 2022-08/09) | Held-out year (test 2024-06) |
+|---|---|---|
+| False alarm, Brier skill | **+0.29** | +0.54 (inflated: 96.5% base rate) |
+| False alarm, ROC AUC | 0.735 | 0.740 |
+| Miss, Brier skill | +0.012 | -0.009 |
+| Trust bands | MEDIUM 25% vs LOW 62% | **all samples in one band** |
 
-Trust bands separate error rates by 2.5-3.7x, but are badly positioned (the
-HIGH band is empty for false alarms). The test set is two months inside a
-single exceptional season, so **no cross-season generalisation is shown**.
-Read [reports/report.md](reports/report.md) - especially Section 6 - before
+Ensemble spread predicts forecast error **within the seasonal regime the
+thresholds were built on**, and stops being useful on a held-out June.
+Discrimination barely changes, so the cause looks like the season-aggregated
+threshold definition rather than the error model - a specific, testable
+diagnosis. Read Section 4.4 of [reports/report.md](reports/report.md) before
 using any number here.
 
 ## Status
@@ -42,7 +45,7 @@ using any number here.
 | 6 | Calibration, trust bands | done (ablations and SHAP not reached) |
 | 7 | Frozen evaluation, case study | evaluation done on reduced split |
 | 8 | Records, hashing, mock registry, verification | done |
-| 9 | Testnet deployment, live ledger | not reached (mock registry documented) |
+| 9 | Deployment, live ledger | deployed + verified on a **local** chain; no public testnet; live ledger not reached |
 | 10 | Report, README | done |
 
 The split had to be re-frozen onto available data because ECMWF never
