@@ -158,6 +158,26 @@ It currently does: the BoM RMM file ends 2024-02-24 and covers none of the 2024
 calibration or 2025 test seasons, so OMI is the MJO source. See
 `docs/decisions.md`.
 
+## Smart contract
+
+`contracts/ForecastRegistry.sol` — owner-only, append-only. Enforces the
+timing rules that give the audit trail meaning: no commit at or after the
+window opens, no outcome before it closes, no duplicate ids, no empty hashes,
+and the commit timestamp always comes from the chain rather than the caller.
+
+```bash
+npm install
+npx hardhat test        # 24 tests
+```
+
+**Not yet deployed.** The Python mock registry in `src/audit/` implements and
+enforces the identical rules, and is what the records in `records/` were
+committed to, using a simulated clock set to each forecast's historical issue
+time. See `docs/deployment.md` for the deploy runbook and an important
+constraint: archived 2022 forecasts *cannot* be committed to a live chain,
+because the contract correctly rejects any commit after its window has
+opened.
+
 ## Licensing
 
 The **code** in this repository is MIT licensed (see `LICENSE`).
