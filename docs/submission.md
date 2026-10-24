@@ -13,6 +13,28 @@ said so before the rain.
 
 ---
 
+## Track
+
+**Climate Data & Environmental Monitoring.**
+
+That track's stated problem is that environmental data is *fragmented and
+difficult to verify*, and the first build it names is a **climate data
+verification platform**. That is precisely what this is, applied to forecast
+data:
+
+| Track asks for | What this project does |
+|---|---|
+| Climate data verification platforms | Every forecast and its trust label is hashed and committed **before** the rain window opens; anyone can recompute the hash and check the timing |
+| Tools for research and insights | A reproducible pipeline that quantifies *when* an extreme-rainfall forecast should not be trusted, with honest skill scores and confidence intervals |
+
+The angle is reliability and accountability rather than data fragmentation:
+the problem we attack is that a forecast is easy to issue and hard to hold to
+account afterwards. A warning that fails repeatedly teaches people to ignore
+the next one, and nothing in the current system records what was claimed, or
+how confident it was, before the outcome became knowable.
+
+---
+
 ## Inspiration
 
 The 2022 Pakistan floods affected over 30 million people. Forecasts existed.

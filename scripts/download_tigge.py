@@ -465,14 +465,38 @@ def run_loop(cfg, client, store, logger, months, selected, types, groups,
     would leave the queue under-filled for hours at a time.
     """
     passes = 0
+    consecutive_errors = 0
     while True:
         passes += 1
-        counts = collect_once(cfg, client, store, logger)
 
-        outstanding = outstanding_work(cfg, store, months, selected, types,
-                                       groups)
-        submitted, submit_failed = fill_slots(
-            cfg, client, store, logger, outstanding, max_in_flight, False)
+        # A pass must never end the run. The job ids are on disk, so the right
+        # response to any transient failure - DNS, a 502, a dropped socket -
+        # is to log it and poll again; the queue keeps working server-side
+        # while we are blind. An earlier collector was killed by one
+        # unhandled DNS lookup failure after 40 minutes of polling.
+        try:
+            counts = collect_once(cfg, client, store, logger)
+            outstanding = outstanding_work(cfg, store, months, selected, types,
+                                           groups)
+            submitted, submit_failed = fill_slots(
+                cfg, client, store, logger, outstanding, max_in_flight, False)
+            consecutive_errors = 0
+        except KeyboardInterrupt:
+            logger.info("interrupted; %d job(s) remain queued at ECDS and are "
+                        "recorded in %s", store.n_in_flight(), store.path)
+            return 0
+        except Exception as exc:
+            consecutive_errors += 1
+            logger.error("pass %d failed (%s): %s", passes,
+                         type(exc).__name__, exc)
+            if consecutive_errors >= 30:
+                logger.error("%d consecutive failed passes; giving up. "
+                             "Queued jobs are recorded in %s and can be "
+                             "collected later.", consecutive_errors, store.path)
+                return 1
+            # Back off a little, but keep polling: the network usually returns.
+            time.sleep(min(interval, 60 * consecutive_errors))
+            continue
 
         live = store.live()
         pending = store.pending_download()

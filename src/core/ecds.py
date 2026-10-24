@@ -43,6 +43,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import requests
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 from src.core.config import get_credential, load_dotenv_if_present
 from src.core.manifest import utc_now_iso
@@ -97,6 +99,24 @@ class EcdsClient:
             )
         self._session = requests.Session()
         self._session.headers.update({"PRIVATE-TOKEN": self.pat})
+
+        # This machine's DNS drops intermittently: a lookup of ecds.ecmwf.int
+        # failed mid-run on 2026-10-24 and killed a collector that had been
+        # polling for 40 minutes. Since the whole point of persisting job ids
+        # is to ride out a bad network, transport errors must be retried here
+        # rather than raised at the caller.
+        retry = Retry(
+            total=6,
+            connect=6,          # covers DNS resolution failures
+            read=4,
+            backoff_factor=2.0,  # 0s, 4s, 8s, 16s, 32s, 64s
+            status_forcelist=(429, 500, 502, 503, 504),
+            allowed_methods=frozenset(["GET", "POST", "DELETE"]),
+            raise_on_status=False,
+        )
+        adapter = HTTPAdapter(max_retries=retry)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     # -- raw helpers ---------------------------------------------------------
 
@@ -160,8 +180,23 @@ class EcdsClient:
                     found[str(job.get("jobID"))] = str(job.get("status"))
         except Exception:
             pass
+
         # Fall back to a per-job call only for ids the listing did not cover.
-        return {jid: found.get(jid) or self.status(jid) for jid in wanted}
+        # A job whose state cannot be established right now is omitted rather
+        # than guessed: the caller keeps the state it already had and tries
+        # again next pass. Reporting an unknown state as a real one would risk
+        # treating a live job as dead and requeuing it, paying the tape wait
+        # twice.
+        out: dict[str, str] = {}
+        for jid in wanted:
+            if jid in found:
+                out[jid] = found[jid]
+                continue
+            try:
+                out[jid] = self.status(jid)
+            except Exception:
+                continue
+        return out
 
     def result_href(self, job_id: str) -> tuple[str, int | None]:
         """Download URL and byte size for a successful job."""
