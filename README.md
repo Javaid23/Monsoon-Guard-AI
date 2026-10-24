@@ -132,9 +132,21 @@ python scripts/download_mjo.py --check-only    # re-check local copies
 ```bash
 python scripts/build_labels.py          # thresholds, signals, error targets
 python scripts/run_evaluation.py        # the frozen evaluation (run once)
+python scripts/make_figures.py          # figures, from saved results only
 python scripts/build_records.py         # hashed records + mock registry
-pytest -q                               # 147 tests
+pytest -q
 ```
+
+## Verification app
+
+```bash
+streamlit run src/app/streamlit_app.py
+```
+
+Read-only: it shows saved pipeline output and the registry, and never trains
+or recomputes anything. Four pages - verify a record (with a "try tampering
+with it" control that demonstrates detection), trust view, evaluation
+results, and ledger status.
 
 `scripts/provisional_baseline.py` runs the model ladder on training months
 only, for use while data is still downloading. It refuses to run once

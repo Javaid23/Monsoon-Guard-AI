@@ -1,7 +1,13 @@
 require("@nomicfoundation/hardhat-toolbox");
 // Private key and RPC URL come from .env and are never committed
-// (CLAUDE.md sections 2.8 and 10.4).
-require("dotenv").config();
+// (CLAUDE.md sections 2.8 and 10.4). Optional, so that `hardhat test` works
+// on a clean checkout with no .env: the in-process network needs no secrets,
+// and only a live deployment does.
+try {
+  require("dotenv").config();
+} catch {
+  /* dotenv absent: fall back to the real environment */
+}
 
 const AMOY_RPC_URL =
   process.env.AMOY_RPC_URL || "https://rpc-amoy.polygon.technology";

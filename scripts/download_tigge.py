@@ -128,22 +128,69 @@ def manifest_id_for(group_name: str, fc_type: str, month: SeasonMonth) -> str:
                                     month.year, month.month)
 
 
-def forecast_types(cfg, which: str) -> list[str]:
+# Which forecast types each parameter group is fetched for.
+#
+# Only precipitation gets the full perturbed ensemble. The atmospheric context
+# groups are control-only, decided on 2026-10-16 (docs/decisions.md,
+# "Atmospheric features come from the control forecast only"): a perturbed
+# surface request is ~16,700 fields per month against ~560 for the control, so
+# ensembles for every variable would cost roughly 13.5 h instead of 0.5 h.
+# CLAUDE.md section 7.2 asks for these fields as context and never asks for
+# their spread, so nothing in the feature set is lost.
+#
+# This lives here rather than behind the --type flag because passing
+# `--group all --type both` would silently reinstate that 6x cost.
+GROUP_TYPES = {
+    "precip": ("perturbed", "control"),
+    "surface": ("control",),
+    "pressure": ("control",),
+}
+
+# Cheapest-useful-first. Precipitation defines the labels, so nothing can be
+# built without it, and its perturbed requests are by far the slowest - they
+# should hold slots while the small atmospheric requests fill the rest.
+GROUP_ORDER = {"precip": 0, "surface": 1, "pressure": 2}
+TYPE_ORDER = {"perturbed": 0, "control": 1}
+
+
+def forecast_types(cfg, which: str, group_name: str | None = None) -> list[str]:
+    """Forecast types to fetch, honouring the per-group decision above."""
     types_cfg = cfg["forecast"]["forecast_types"]
+    allowed = GROUP_TYPES.get(group_name, ("perturbed", "control"))
+
     if which == "both":
-        types = [types_cfg["perturbed"]]
-        if cfg["forecast"]["members"]["include_control"]:
-            types.append(types_cfg["control"])
-        return types
-    return [types_cfg["perturbed" if which == "pf" else "control"]]
+        keys = [k for k in ("perturbed", "control") if k in allowed]
+        if "control" in keys and not cfg["forecast"]["members"]["include_control"]:
+            keys.remove("control")
+        return [types_cfg[k] for k in keys]
+
+    key = "perturbed" if which == "pf" else "control"
+    # An explicit --type that a group does not take yields nothing for that
+    # group, rather than quietly fetching the expensive variant.
+    return [types_cfg[key]] if key in allowed else []
 
 
-def planned_work(cfg, months, groups, selected, types):
-    """Every (group, type, month) the configuration asks for, in order."""
-    for month in months:
-        for group_name in selected:
-            for fc_type in types:
-                yield group_name, groups[group_name], fc_type, month
+def planned_work(cfg, months, groups, selected, types_arg):
+    """Every (group, type, month) the configuration asks for.
+
+    Ordered group-major so that precipitation is requested before the
+    atmospheric groups, since the labels depend on it.
+    """
+    plan = []
+    for group_name in selected:
+        for fc_type in forecast_types(cfg, types_arg, group_name):
+            short_key = ("perturbed" if fc_type.startswith("perturbed")
+                         else "control")
+            for month in months:
+                plan.append((
+                    GROUP_ORDER.get(group_name, 99),
+                    TYPE_ORDER.get(short_key, 99),
+                    month.year, month.month,
+                    group_name, groups[group_name], fc_type, month,
+                ))
+    plan.sort(key=lambda row: row[:4])
+    for row in plan:
+        yield row[4], row[5], row[6], row[7]
 
 
 # --- submit -----------------------------------------------------------------
@@ -542,14 +589,19 @@ def main() -> int:
 
     groups = param_groups(cfg)
     selected = list(groups) if args.group == "all" else [args.group]
-    types = forecast_types(cfg, args.type)
+    # Passed through as the raw flag: the forecast types are resolved per
+    # group, because the atmospheric groups are control-only (see GROUP_TYPES).
+    types = args.type
 
     r = cfg["region"]
     logger.info("phase: %s", args.phase)
     logger.info("dataset: %s   origin: %s", cfg["forecast"]["dataset"],
                 cfg["forecast"]["origin"])
     logger.info("area [N,W,S,E]: %s", [r["north"], r["west"], r["south"], r["east"]])
-    logger.info("months: %d, groups: %s, types: %s", len(months), selected, types)
+    logger.info("months: %d, groups: %s", len(months), selected)
+    for group_name in selected:
+        logger.info("    %-9s -> %s", group_name,
+                    forecast_types(cfg, types, group_name))
     logger.info("job store: %s (%d entries)", store.path, len(store.jobs))
 
     if args.phase == "status":
