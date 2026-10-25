@@ -128,10 +128,6 @@ CSS = """
     font-size: .76rem !important; color: #a9c7e2 !important;
     font-weight: 400; margin-top: .05rem;
   }
-
-  .sb-rule {height:1px; background:rgba(255,255,255,.12); margin:1.1rem 0;}
-
-  .sb-foot {font-size:.76rem; color:#a9c7e2 !important; line-height:1.5;}
 </style>
 """
 
@@ -417,7 +413,10 @@ def page_overview():
             "final test covered a single month. Atmospheric measurements we "
             "had planned to use never arrived from the data archive. The "
             "trust categories are set at the wrong levels. All of this is "
-            "written up in the technical report rather than hidden.")
+            "written up in the technical report rather than hidden.\n\n"
+            "Nothing here is calculated live. Every figure on this site was "
+            "produced earlier and recorded, so what you see is exactly what "
+            "was committed &mdash; it cannot quietly change between visits.")
 
 
 def page_verify():
@@ -525,38 +524,47 @@ def page_verify():
                     unsafe_allow_html=True)
 
     st.write("")
-    st.markdown("### Try to fake it")
-    st.markdown("<p class='note'>Change any value below and press re-check. "
-                "If the record could be quietly rewritten after the fact, "
-                "this whole idea would be worthless &mdash; so watch it "
-                "fail.</p>", unsafe_allow_html=True)
-    t1, t2, t3 = st.columns([2, 2, 1])
-    FIELD_LABELS = {"Chance it is wrong": "p_wrong_bp",
-                    "Computer runs predicting rain": "signal_bp",
-                    "Our rating": "trust_label"}
-    label = t1.selectbox("Value to change", list(FIELD_LABELS))
-    field = FIELD_LABELS[label]
-    shown = (record[field] / 100 if field.endswith("_bp") else record[field])
-    new_value = t2.text_input("Change it to", value=str(shown))
-    t3.write("")
-    t3.write("")
-    if t3.button("Re-check", type="primary"):
+    # This used to be a dropdown, a text box and a button, which asked the
+    # reader to invent a tampering scenario before anything happened. The
+    # point is not to let people edit records; it is to show that editing one
+    # is caught. So it is a single button that performs the most tempting
+    # edit there is - claiming afterwards to have been more confident than
+    # you were - and shows the result.
+    st.markdown("### Could we just change it afterwards?")
+    real_pct = record["p_wrong_bp"] / 100
+    st.markdown(
+        "<p class='note'>Suppose that after the floods we wanted to look "
+        "better, and quietly rewrote this forecast to claim we had been "
+        "confident all along &mdash; changing our &ldquo;%.0f%% chance this "
+        "warning is wrong&rdquo; to &ldquo;5%%&rdquo;. Press the button and "
+        "see what happens.</p>" % real_pct, unsafe_allow_html=True)
+
+    if st.button("Rewrite the record and check it again", type="primary"):
         tampered = dict(record)
-        try:
-            tampered[field] = (int(round(float(new_value) * 100))
-                               if field.endswith("_bp") else new_value)
-        except ValueError:
-            st.error("%s needs to be a number." % label)
-            return
+        tampered["p_wrong_bp"] = 500          # 5.00%, a flattering rewrite
         bad = verify_record(tampered, entry, outcome)
+
+        b1, b2 = st.columns(2)
+        card(b1, "What was locked away", "%.0f%%" % real_pct,
+             "sealed before the rain", OK)
+        card(b2, "What we tried to claim", "5%",
+             "edited after the outcome was known", BAD)
+
         bcol, btitle, bblurb = STATUS_STYLE.get(
             bad.status, (MUTED, bad.status.value, ""))
         st.markdown("<div class='statusbar' style='background:%s'>%s<small>%s"
                     "</small></div>" % (bcol, btitle, bblurb),
                     unsafe_allow_html=True)
         if bad.status == Status.MISMATCH:
-            st.success("Caught. The edited version does not match the locked "
-                       "copy, so the change is detected immediately.")
+            st.success("**Caught, instantly.** The rewritten version no "
+                       "longer matches the copy that was sealed before the "
+                       "rain, so the edit is obvious to anyone checking. "
+                       "That is the whole point: claiming afterwards that "
+                       "you predicted something means nothing unless you "
+                       "can prove you said it beforehand.")
+        else:
+            st.warning("Unexpected result: the edit was not flagged. That "
+                       "would be a bug worth reporting.")
 
     with st.expander("What this does and does not prove"):
         st.markdown(
@@ -919,18 +927,13 @@ def main():
         choice = st.radio("Page", list(PAGES), label_visibility="collapsed",
                           captions=[PAGE_HINTS[p] for p in PAGES])
 
-        # The sidebar used to carry a record count, the test month and a
-        # storage badge. None of it helped anyone choose a page, and all of
-        # it was internal bookkeeping shown on every screen. Where the
-        # records live is stated in full on the Ledger page, which is where
-        # someone asking that question goes, so nothing honest is lost by
-        # dropping the badge here.
-        st.markdown("<div class='sb-rule'></div>", unsafe_allow_html=True)
-        st.markdown(
-            "<div class='sb-foot'>This page only shows results. It never "
-            "runs the forecast models itself, so what you see is exactly "
-            "what was produced and recorded earlier.</div>",
-            unsafe_allow_html=True)
+        # The sidebar is navigation and nothing else. It previously carried
+        # a record count, the test month as a raw code, a storage badge and
+        # a note about the app being read-only - none of which helps anyone
+        # choose a page, and all of which appeared on every screen. Each
+        # point is still made where it is actually relevant: the Ledger page
+        # says where records are held, and the Overview says the app only
+        # displays results.
 
     PAGES[choice]()
 
