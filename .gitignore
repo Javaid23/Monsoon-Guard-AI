@@ -49,3 +49,8 @@ contracts/.cache/
 # deployed to. Shipping one that points at 127.0.0.1 would imply a
 # deployment a reader cannot reach. Commit it only for a public network.
 records/registry_deployment.json
+
+# The ots client writes a .bak beside a proof when it upgrades it; the
+# upgraded proof supersedes it and the backup is just the weaker, pending
+# version of the same thing.
+*.ots.bak
