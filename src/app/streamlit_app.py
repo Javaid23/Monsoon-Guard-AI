@@ -60,7 +60,7 @@ CSS = """
   h1, h2, h3 {letter-spacing: -0.015em;}
 
   .hero {
-    background: linear-gradient(135deg, #072b45 0%, #0d4a75 55%, #1769aa 100%);
+    background: linear-gradient(135deg, #0b4f8a 0%, #1565c0 55%, #1e88e5 100%);
     color: #fff; padding: 1.6rem 1.9rem; border-radius: 14px; margin-bottom: 1.5rem;
   }
   .hero h1 {margin: 0 0 .35rem 0; font-size: 1.85rem; color: #fff;}
@@ -96,10 +96,10 @@ CSS = """
   .note {font-size:.87rem; color:#636c76; line-height:1.55;}
   /* ---- sidebar ---- */
   section[data-testid="stSidebar"] {
-    background: #0b2638;
-    border-right: 1px solid #071a28;
+    background: #0d3b66;
+    border-right: 1px solid #0a2f52;
   }
-  section[data-testid="stSidebar"] * {color: #e9eff5;}
+  section[data-testid="stSidebar"] * {color: #eef5fb;}
 
   .brand {padding: .35rem 0 1.1rem 0;}
   .brand-name {
@@ -107,7 +107,7 @@ CSS = """
     color: #fff; line-height: 1.2;
   }
   .brand-sub {
-    font-size: .83rem; color: #9dbdd6 !important; margin-top: .3rem;
+    font-size: .83rem; color: #b9d4ea !important; margin-top: .3rem;
     line-height: 1.45;
   }
 
@@ -125,7 +125,7 @@ CSS = """
   }
   section[data-testid="stSidebar"] div[role="radiogroup"] > label
     div[data-testid="stCaptionContainer"] p {
-    font-size: .76rem !important; color: #8aa9c2 !important;
+    font-size: .76rem !important; color: #a9c7e2 !important;
     font-weight: 400; margin-top: .05rem;
   }
 
@@ -133,7 +133,7 @@ CSS = """
 
   .sb-stats {display:flex; flex-direction:column; gap:.5rem;}
   .sb-stat {display:flex; justify-content:space-between; align-items:baseline;}
-  .sb-stat span {font-size:.8rem; color:#9dbdd6 !important;}
+  .sb-stat span {font-size:.8rem; color:#b9d4ea !important;}
   .sb-stat b {font-size:.95rem; color:#fff !important;}
 
   .sb-reg {
@@ -142,14 +142,14 @@ CSS = """
   }
   .sb-reg-top {font-size:.88rem; font-weight:600; display:flex;
                align-items:center; gap:.45rem;}
-  .sb-reg-sub {font-size:.76rem; color:#9dbdd6 !important; margin-top:.25rem;
+  .sb-reg-sub {font-size:.76rem; color:#b9d4ea !important; margin-top:.25rem;
                line-height:1.4; word-break:break-all;}
   .dot {width:8px; height:8px; border-radius:50%; display:inline-block;}
 
-  .sb-link {font-size:.8rem; color:#6ec6f2 !important; text-decoration:none;}
+  .sb-link {font-size:.8rem; color:#8fd3ff !important; text-decoration:none;}
   .sb-link:hover {text-decoration:underline;}
 
-  .sb-foot {font-size:.76rem; color:#8aa9c2 !important; line-height:1.5;}
+  .sb-foot {font-size:.76rem; color:#a9c7e2 !important; line-height:1.5;}
 </style>
 """
 
