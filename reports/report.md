@@ -133,7 +133,8 @@ year** (train 2021-2022, calibrate 2023-06, test 2024-06) and compares the
 two. Both were run once on their own test set; both are kept because the
 difference between them is the finding. Raw output for each is in
 `reports/evaluation_results_2022split.json` and
-`reports/evaluation_results_2024split.json`.
+`reports/evaluation_results.json` (the held-out year is the headline
+evaluation, so it carries the plain name the app reads).
 
 ### 4.1 Forecast verification (in-regime test split)
 
