@@ -95,13 +95,14 @@ Pick any record. Point at the green banner and the list of checks.
 > "The page recomputes the SHA-256 from the published record, compares it
 > with what was sealed, and confirms the seal came first. All checks pass."
 
-Open the tamper control. Change the wrongness probability sharply — e.g.
-8767 down to 500.
+Scroll to **"Could we just change it afterwards?"** and press the button.
 
-> "Now suppose that after the flood we wanted to claim we'd been more
-> confident than we really were. Drop it from 88% to 5%…"
+> "Now suppose that after the flood we wanted to look better, and quietly
+> rewrote this forecast to claim we'd been confident all along — dropping
+> our 88% chance of being wrong down to 5%."
 
-Re-check. **Let the red failure sit on screen for a beat.**
+**Let the red failure sit on screen for a beat.** The two cards above it
+show what was locked against what we tried to claim.
 
 > "Caught instantly. You don't have to trust us. You can check."
 
@@ -142,7 +143,7 @@ itself part of the claim: the results were fixed before submission.
 
 **On screen:** terminal with `pytest -q` and `npx hardhat test` finishing.
 
-> "209 Python tests and 33 contract tests, including leakage checks that
+> "207 Python tests and 33 contract tests, including leakage checks that
 > multiply every test-period observation by a thousand and assert the
 > thresholds don't move."
 
