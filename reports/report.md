@@ -335,12 +335,59 @@ the chain rather than the caller, and tamper detection confirmed against it.
 A Python client (`src/audit/chain_client.py`) reads and writes the deployed
 contract over JSON-RPC.
 
-**No public testnet deployment was reached**, so a third party cannot
-independently check any of this - a local chain is reproducible but not
-externally verifiable, and the app labels it as such rather than implying
-otherwise. The archived 2022 records remain on the mock registry, and must:
-the contract correctly refuses any commit once a window has opened, so
-historical forecasts cannot be committed live. That is the rule working.
+**No public testnet deployment was reached**, so the contract's own address
+is not something an outsider can call - a local chain is reproducible but
+not externally verifiable, and the app labels it as such rather than
+implying otherwise. Every faucet attempted required either an existing
+Ethereum mainnet balance or a captcha.
+
+The archived 2022 records remain on the mock registry, and must: the
+contract correctly refuses any commit once a window has opened, so
+historical forecasts cannot be committed live. That is the rule working, not
+a gap. A timestamp written in 2026 could not prove a forecast for August
+2022 came before the rain, and a contract that accepted one would be
+inviting exactly the backdating it exists to prevent.
+
+### 5.1 What *can* be proved publicly, and is
+
+There is a weaker claim that holds for a replay: not "we said this first",
+but "this exact set of results has not been edited since publication". That
+one is worth proving, and costs nothing.
+
+All 24 records are folded into a single Merkle root - leaves are the SHA-256
+digests of the canonical record bytes in sorted id order, internal nodes are
+keccak256 over the pair sorted as integers, so a proof carries no position
+bits. The differing hash functions at leaf and node level are deliberate:
+no leaf can be mistaken for an internal node, which is the second-preimage
+defence. An odd node at any level is carried up unchanged rather than paired
+with itself, closing the duplicate-leaf forgery.
+
+| | |
+|---|---|
+| Merkle root | `0x0f2956487384a095fb211181fe3f0810940d4888a0923579f010fd047cea1561` |
+| Bitcoin block | 972977, mined 2026-10-24 21:28 UTC |
+| Leaves | 24 (12 forecasts, 12 outcomes) |
+| Proof | `records/archive_manifest.json.ots` |
+
+The root is published on chain by `ForecastRegistry.publishArchive`, and
+anchored in Bitcoin itself through OpenTimestamps - free, because public
+calendar servers batch thousands of unrelated hashes into one transaction
+and share its fee. The proof is self-contained after confirmation: it
+verifies against the Bitcoin blockchain alone and never needs those servers
+again, which matters because nobody has promised to keep them running.
+
+The tree is built in Python (`src/audit/merkle.py`) and verified by the
+Solidity contract. Two implementations of one structure in two languages is
+exactly where a silent mismatch hides, so `publish_archive.py --check`
+pushes every leaf through the real contract before anything is published;
+all 24 verify and a tampered leaf is rejected.
+
+The honest caveat, stated because the alternative reads as overclaiming: the
+Bitcoin block contains an *aggregated* root covering many unrelated
+timestamps, not this project's hash in readable form. The `.ots` file
+supplies the hash path linking the two. The defensible claim is "anchored in
+block 972977, verifiable with the included proof" - not "our data is written
+into block 972977".
 
 ---
 

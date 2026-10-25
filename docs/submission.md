@@ -114,6 +114,19 @@ Isotonic calibration, fitted only on the calibration split, moved it to
   two conditional targets that never mix.
 - **Audit:** canonical JSON with floats rejected outright (probabilities in
   basis points) so hashes reproduce across platforms.
+- **Two different claims, kept apart.** The contract's `commit` refuses any
+  record whose rain window has already opened — so a 2022 replay cannot go
+  through it, and should not: a timestamp written in 2026 cannot prove a
+  forecast came before rain that already fell. Retrospective results instead
+  go through `publishArchive`, which makes the claim that *is* true of them:
+  this exact set existed, unaltered, at this moment. Conflating the two
+  would let a backdated result pose as a prediction.
+- **Anchored in Bitcoin.** All 24 records fold into one Merkle root, and that
+  root is timestamped in **Bitcoin block 972977** (mined 2026-10-24 21:28
+  UTC) via OpenTimestamps — free, no wallet, no key to lose. The tree is
+  built in Python and verified by the Solidity contract, so both
+  implementations are checked against each other before anything is
+  published.
 
 **209 Python tests and 33 Solidity contract tests**, including leakage
 checks that multiply every test-year
@@ -174,7 +187,10 @@ it, when in fact it ranked perfectly well.
   seeing results.
 - The contract is deployed and working on a **local** chain, with a real
   commit and tamper detection verified against it, but **not on a public
-  testnet** — so nobody outside can independently check it.
+  testnet** — every faucet we tried required either an existing Ethereum
+  mainnet balance or a captcha. The published results *are* independently
+  checkable, through the Bitcoin anchor above, but the contract's own
+  address is not yet something an outsider can call.
 
 The blockchain proves a record existed unchanged before its window opened. It
 does not prove the forecast was good, and an owner-controlled registry cannot
@@ -235,3 +251,17 @@ streamlit run src/app/streamlit_app.py      # verification page
 
 Open the verification page, pick any record, then use **"Try tampering with
 it"** to change a value and watch verification fail.
+
+To check the Bitcoin anchor yourself, with nothing from us:
+
+```bash
+pip install opentimestamps-client
+ots verify records/archive_manifest.json.ots      # against Bitcoin block 972977
+python scripts/publish_archive.py --check         # rebuild the root, verify in Solidity
+```
+
+Or drop `records/archive_manifest.json` and `records/archive_manifest.json.ots`
+into [opentimestamps.org](https://opentimestamps.org) in a browser. The block
+holds an aggregated root covering thousands of unrelated timestamps, not our
+hash in readable form — the proof file supplies the path between them, which
+is why verification needs both files.
