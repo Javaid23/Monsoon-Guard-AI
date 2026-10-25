@@ -131,30 +131,13 @@ CSS = """
 
   .sb-rule {height:1px; background:rgba(255,255,255,.12); margin:1.1rem 0;}
 
-  .sb-stats {display:flex; flex-direction:column; gap:.5rem;}
-  .sb-stat {display:flex; justify-content:space-between; align-items:baseline;}
-  .sb-stat span {font-size:.8rem; color:#b9d4ea !important;}
-  .sb-stat b {font-size:.95rem; color:#fff !important;}
-
-  .sb-reg {
-    margin-top:1rem; padding:.7rem .8rem; border-radius:9px;
-    background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.1);
-  }
-  .sb-reg-top {font-size:.88rem; font-weight:600; display:flex;
-               align-items:center; gap:.45rem;}
-  .sb-reg-sub {font-size:.76rem; color:#b9d4ea !important; margin-top:.25rem;
-               line-height:1.4; word-break:break-all;}
-  .dot {width:8px; height:8px; border-radius:50%; display:inline-block;}
-
-  .sb-link {font-size:.8rem; color:#8fd3ff !important; text-decoration:none;}
-  .sb-link:hover {text-decoration:underline;}
-
   .sb-foot {font-size:.76rem; color:#a9c7e2 !important; line-height:1.5;}
 </style>
 """
 
 
 # --- loading -----------------------------------------------------------------
+
 
 @st.cache_resource
 def _registry():
@@ -224,6 +207,7 @@ def load_thresholds() -> pd.DataFrame | None:
 
 # --- small builders ----------------------------------------------------------
 
+
 def nice_date(iso: str | None) -> str:
     """'2022-08-01T06:00:00Z' -> '1 August 2022'. Timestamps to the second
     are precision nobody reading this page needs."""
@@ -268,6 +252,7 @@ def fig(name: str, caption: str = ""):
 
 
 # --- pages -------------------------------------------------------------------
+
 
 def page_overview():
     ev = load_evaluation()
@@ -901,7 +886,6 @@ def page_ledger():
                        "works end to end, but an outsider cannot check it "
                        "independently.")
 
-
 PAGES = {
     "Overview": page_overview,
     "Verify a record": page_verify,
@@ -910,7 +894,6 @@ PAGES = {
     "The region": page_region,
     "Ledger status": page_ledger,
 }
-
 
 PAGE_HINTS = {
     "Overview": "Start here",
@@ -936,36 +919,12 @@ def main():
         choice = st.radio("Page", list(PAGES), label_visibility="collapsed",
                           captions=[PAGE_HINTS[p] for p in PAGES])
 
-        st.markdown("<div class='sb-rule'></div>", unsafe_allow_html=True)
-
-        records = load_records()
-        ev = load_evaluation()
-        tested = ", ".join((ev or {}).get("split", {}).get("test", [])) or "—"
-        st.markdown(
-            "<div class='sb-stats'>"
-            "<div class='sb-stat'><span>Forecasts on record</span><b>%d</b></div>"
-            "<div class='sb-stat'><span>Tested on</span><b>%s</b></div>"
-            "</div>" % (len(records), tested), unsafe_allow_html=True)
-
-        info = chain_info()
-        if info is None:
-            dot, label, detail = "#8c959f", "Local record store", \
-                "Records are held in a local tamper-proof store"
-        elif info.is_public:
-            dot, label, detail = OK, "Live on blockchain", info.address[:10] + "…"
-        else:
-            dot, label, detail = "#0969da", "Test blockchain", \
-                "Running on a local test chain"
-        st.markdown(
-            "<div class='sb-reg'><div class='sb-reg-top'>"
-            "<span class='dot' style='background:%s'></span>%s</div>"
-            "<div class='sb-reg-sub'>%s</div></div>" % (dot, label, detail),
-            unsafe_allow_html=True)
-        if info is not None and info.explorer_url:
-            st.markdown("<a class='sb-link' href='%s' target='_blank'>"
-                        "View on block explorer &rarr;</a>" % info.explorer_url,
-                        unsafe_allow_html=True)
-
+        # The sidebar used to carry a record count, the test month and a
+        # storage badge. None of it helped anyone choose a page, and all of
+        # it was internal bookkeeping shown on every screen. Where the
+        # records live is stated in full on the Ledger page, which is where
+        # someone asking that question goes, so nothing honest is lost by
+        # dropping the badge here.
         st.markdown("<div class='sb-rule'></div>", unsafe_allow_html=True)
         st.markdown(
             "<div class='sb-foot'>This page only shows results. It never "
@@ -974,6 +933,5 @@ def main():
             unsafe_allow_html=True)
 
     PAGES[choice]()
-
 
 main()
