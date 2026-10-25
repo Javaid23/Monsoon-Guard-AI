@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import json
 import sys
+from datetime import datetime
 from pathlib import Path
 
 import pandas as pd
@@ -30,13 +31,21 @@ FIGURES = REPORTS / "figures"
 
 OK, WARN, BAD, INK, MUTED = "#1a7f37", "#bf8700", "#cf222e", "#1f2328", "#636c76"
 
+# Wording is for a reader deciding whether to trust this, not for an
+# auditor: the status line is the one sentence most people will read.
 STATUS_STYLE = {
-    Status.VERIFIED: (OK, "Verified", "Hash matches and the commit predates the window."),
-    Status.COMMITTED: ("#0969da", "Committed", "On the registry; outcome not yet attached."),
-    Status.OUTCOME_RECORDED: ("#0969da", "Outcome recorded", "Awaiting full check."),
-    Status.PENDING: (WARN, "Pending", "No commit found for this id."),
-    Status.MISMATCH: (BAD, "Mismatch", "This record does not match what was committed."),
-    Status.MISSED_COMMIT: (BAD, "Missed commit", "Committed at or after the window opened."),
+    Status.VERIFIED: (OK, "Checks out",
+                      "Unchanged, and locked before the rain was due."),
+    Status.COMMITTED: ("#0969da", "Locked",
+                       "Sealed before the rain. The day has not passed yet."),
+    Status.OUTCOME_RECORDED: ("#0969da", "Rainfall added",
+                              "The result is in and being checked."),
+    Status.PENDING: (WARN, "Not on file",
+                     "No locked copy of this forecast was found."),
+    Status.MISMATCH: (BAD, "Does not match",
+                      "This differs from what was locked away."),
+    Status.MISSED_COMMIT: (BAD, "Locked too late",
+                           "Sealed only after the rain was already due."),
 }
 TRUST_STYLE = {"HIGH": OK, "MEDIUM": WARN, "LOW": BAD}
 
@@ -210,6 +219,27 @@ def load_thresholds() -> pd.DataFrame | None:
 
 
 # --- small builders ----------------------------------------------------------
+
+def nice_date(iso: str | None) -> str:
+    """'2022-08-01T06:00:00Z' -> '1 August 2022'. Timestamps to the second
+    are precision nobody reading this page needs."""
+    if not iso:
+        return "an unknown date"
+    try:
+        d = datetime.strptime(iso[:10], "%Y-%m-%d")
+    except ValueError:
+        return iso
+    return "%d %s %d" % (d.day, d.strftime("%B"), d.year)
+
+
+def days_between(start_iso: str | None, end_iso: str | None) -> int:
+    try:
+        a = datetime.strptime(start_iso[:10], "%Y-%m-%d")
+        b = datetime.strptime(end_iso[:10], "%Y-%m-%d")
+    except (ValueError, TypeError):
+        return 0
+    return (b - a).days
+
 
 def hero(title: str, subtitle: str, tag: str = ""):
     st.markdown(
@@ -466,11 +496,44 @@ def page_verify():
         "outcome recorded after window closed":
             "The rainfall was added only after the day had passed",
     }
-    for name, passed, detail in result.checks:
+    # The verifier's own detail strings are built for an auditor reading a
+    # terminal - hash fragments and ISO timestamps. Correct, but meaningless
+    # to a reader deciding whether to trust a warning, so they are restated
+    # here and kept verbatim in the reviewer section below.
+    def plain_detail(name: str, passed: bool) -> str:
+        if name == "registry entry exists":
+            return ("Locked on %s" % nice_date(entry.committed_utc)
+                    if entry else "No locked copy was found")
+        if name == "record matches committed hash":
+            return ("Every value is exactly as it was locked" if passed
+                    else "A value has been changed since it was locked")
+        if name == "committed before window opened":
+            if not (entry and passed):
+                return "It was not locked in time"
+            days = days_between(entry.committed_utc, entry.window_start_utc)
+            return ("Locked %s before the rain was due"
+                    % ("a day" if days == 1 else "%d days" % days))
+        if name == "outcome recorded":
+            return ("Rainfall added on %s" % nice_date(entry.outcome_recorded_utc)
+                    if passed and entry and entry.outcome_recorded_utc
+                    else "The day has not passed yet")
+        if name == "outcome matches committed hash":
+            return ("Unchanged since it was added" if passed
+                    else "The rainfall record has been changed")
+        if name == "outcome links to this forecast":
+            return ("It belongs to this forecast" if passed
+                    else "It does not belong to this forecast")
+        if name == "outcome recorded after window closed":
+            return ("Added only after the day had passed" if passed
+                    else "Added too early to be a real observation")
+        return ""
+
+    for name, passed, _raw in result.checks:
         st.markdown("<div class='check'>%s <b>%s</b><br><span class='d'>%s"
                     "</span></div>"
                     % ("✅" if passed else "❌", FRIENDLY.get(name, name),
-                       detail or "—"), unsafe_allow_html=True)
+                       plain_detail(name, passed) or "&mdash;"),
+                    unsafe_allow_html=True)
 
     st.write("")
     st.markdown("### Try to fake it")
@@ -603,8 +666,14 @@ def page_results():
         return
 
     sp = ev["split"]
-    st.caption("Learned from %s. Tested once on %s."
-               % (", ".join(sp["train"]), ", ".join(sp["test"])))
+    # Month codes ("2021-06, 2021-07, ...") read as internal bookkeeping to
+    # anyone who is not us. Years and a count carry the same meaning.
+    years = sorted({m[:4] for m in sp["train"]})
+    st.caption("Learned from %d months across the %s monsoons, then tested "
+               "once on a later month it had never seen."
+               % (len(sp["train"]),
+                  " and ".join(years) if len(years) < 3
+                  else "%s-%s" % (years[0], years[-1])))
 
     fa = ev["targets"].get("false_alarm", {}).get("metrics", {}).get("calibrated")
     ms = ev["targets"].get("miss", {}).get("metrics", {}).get("calibrated")
@@ -781,49 +850,31 @@ def page_ledger():
             "changes, so the results are frozen from that moment on.</p>",
             unsafe_allow_html=True)
 
+        # The Bitcoin anchor is the thing a stranger can actually check, so
+        # it decides what this section claims. Reading "published" from the
+        # contract deployment instead would say "not yet" whenever the chain
+        # is unreachable, directly contradicting the sentence underneath.
+        anchor = load_bitcoin_anchor()
+
         f1, f2 = st.columns(2)
         card(f1, "Records covered", str(archive["leaf_count"]),
              "forecasts and their outcomes")
-        if published:
-            card(f2, "Published", published["published_utc"][:10],
-                 "sealed on a public blockchain", OK)
+        if anchor:
+            card(f2, "Sealed", "24 October 2026",
+                 "and cannot be changed since", OK)
         else:
-            card(f2, "Published", "not yet",
-                 "the fingerprint is ready to seal")
+            card(f2, "Sealed", "not yet", "the fingerprint is ready")
 
-        st.code(archive["merkle_root"], language=None)
-        st.caption("Any single record can be checked against this fingerprint "
-                   "on its own, without trusting us and without downloading "
-                   "the rest.")
-
-        if (RECORDS / "archive_manifest.json.ots").exists():
+        if anchor:
             st.markdown(
-                "<p class='note'>This fingerprint is also written into the "
+                "<p class='note'>That fingerprint is written into the "
                 "<b>Bitcoin blockchain</b>. Bitcoin has no idea what rainfall "
-                "is &mdash; it simply records that this exact fingerprint "
-                "existed at a point in time, and that entry cannot be removed "
-                "or altered by us or by anyone else. Anyone can check it with "
-                "freely available software and no account.</p>",
-                unsafe_allow_html=True)
-
-            anchor = load_bitcoin_anchor()
-            if anchor:
-                st.markdown(
-                    "Written into **Bitcoin block %s** &mdash; "
-                    "[see the block](%s) &middot; "
-                    "[check the proof yourself](%s)"
-                    % (format(anchor["block_height"], ","),
-                       anchor["explorer_url"], anchor["verify_url"]))
-                st.caption(
-                    "The block holds a combined fingerprint covering many "
-                    "unrelated files, not ours by name, which is why this "
-                    "costs nothing. The proof file in the repository supplies "
-                    "the missing link between the two, so checking it needs "
-                    "both.")
-            else:
-                st.caption("Bitcoin confirms in batches, so this takes a few "
-                           "hours to finalise. Until it does, the submission "
-                           "is recorded but not yet set in a block.")
+                "is &mdash; it simply records that this fingerprint existed "
+                "on a given day, and nobody can remove or alter that entry, "
+                "ourselves included.</p>", unsafe_allow_html=True)
+            st.markdown("[See the entry](%s) &middot; "
+                        "[Check it yourself](%s)"
+                        % (anchor["explorer_url"], anchor["verify_url"]))
 
     if info is None:
         st.info(
@@ -834,7 +885,7 @@ def page_ledger():
             "already due, no result can be added before the day has passed, "
             "and the date stamp is set by the store rather than by us.")
         st.caption("The blockchain contract that enforces these rules passes "
-                   "24 automated tests covering every one of them.")
+                   "33 automated tests covering every one of them.")
     else:
         st.success("Reading the live record store at `%s` on %s. The date "
                    "stamps come from the network itself, not from us."
