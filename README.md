@@ -170,16 +170,48 @@ and the commit timestamp always comes from the chain rather than the caller.
 
 ```bash
 npm install
-npx hardhat test        # 24 tests
+npx hardhat test        # 33 tests
 ```
 
-**Not yet deployed.** The Python mock registry in `src/audit/` implements and
-enforces the identical rules, and is what the records in `records/` were
-committed to, using a simulated clock set to each forecast's historical issue
-time. See `docs/deployment.md` for the deploy runbook and an important
+**Not yet deployed to a public chain.** The Python mock registry in
+`src/audit/` enforces identical rules and is what the records in `records/`
+were committed to, using a simulated clock set to each forecast's historical
+issue time. See `docs/deployment.md` for the deploy runbook and an important
 constraint: archived 2022 forecasts *cannot* be committed to a live chain,
-because the contract correctly rejects any commit after its window has
-opened.
+because the contract correctly rejects any commit at or after its window has
+opened. That rejection is the point, not a limitation — a timestamp written
+today cannot prove a 2022 forecast came before the rain.
+
+## Published results are anchored in Bitcoin
+
+What *can* be proved about a retrospective result is that it has not been
+edited since publication. Every record in `records/` is folded into one
+Merkle root, and that root is timestamped in the Bitcoin blockchain through
+OpenTimestamps — free, with no wallet and no key that can be lost.
+
+| | |
+|---|---|
+| Bitcoin block | [972977](https://mempool.space/block/972977), mined 2026-10-24 21:28 UTC |
+| Merkle root | `0x0f2956487384a095fb211181fe3f0810940d4888a0923579f010fd047cea1561` |
+| Covers | 24 records (12 forecasts, 12 outcomes) |
+| Proof | `records/archive_manifest.json.ots` |
+
+Verify it yourself, with no help from us — either at
+[opentimestamps.org](https://opentimestamps.org) by supplying
+`records/archive_manifest.json` and the `.ots` file, or:
+
+```bash
+pip install opentimestamps-client
+ots verify records/archive_manifest.json.ots
+python scripts/publish_archive.py --check   # rebuild the root, check in Solidity
+```
+
+One honest caveat: the Bitcoin block holds an *aggregated* root covering
+thousands of unrelated timestamps, not our hash in readable form. That
+sharing is why it costs nothing. The `.ots` file supplies the hash path from
+our fingerprint to the published root, so verification needs both files.
+The claim is "anchored in block 972977, verifiable with the included proof",
+not "our data is written in block 972977".
 
 ## Licensing
 

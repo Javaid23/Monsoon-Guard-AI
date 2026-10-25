@@ -1,7 +1,11 @@
 # 3-minute demo script
 
 Deliverable 5 in CLAUDE.md section 12. Timings are generous; a clean run
-lands around 2:40, leaving room to speak slowly.
+lands around 2:45, leaving room to speak slowly.
+
+Every number below is read from `reports/evaluation_results.json` and
+`reports/evaluation_results_2022split.json`. If you re-run the evaluation,
+re-check them before recording. Do not round in your favour.
 
 **Before recording**
 
@@ -9,129 +13,160 @@ lands around 2:40, leaving room to speak slowly.
 streamlit run src/app/streamlit_app.py
 ```
 
-Have ready in separate tabs or windows: the app, `reports/report.md`, and a
-terminal. Record at 1080p or better; the app has small text in tables.
+Have ready in separate tabs: the app and a terminal. Record at 1080p or
+better — the tables have small text.
 
 ---
 
 ## 0:00 – 0:25 · The problem
 
-> "In 2022, floods in Pakistan affected over thirty million people. Forecasts
-> existed. The hard question isn't *will it rain heavily* — it's *should I act
-> on this particular forecast*."
+> "In 2022, floods in Pakistan affected more than thirty million people.
+> Forecasts existed. The hard question was never *will it rain heavily* —
+> it's *should I act on this particular warning*."
 
-> "Because a warning that fails repeatedly teaches people to ignore the next
-> one. And right now, nothing records what a forecaster claimed, or how
-> confident they were, before the outcome was knowable."
+> "Because warnings that keep failing teach people to ignore the next one.
+> And nothing today records what was claimed, or how confident anyone was,
+> before the outcome could be known."
 
-**On screen:** title slide, or the report's opening question.
-
----
-
-## 0:25 – 1:05 · What we found
-
-**On screen:** app → *Evaluation results* page.
-
-> "We compared archived ensemble forecasts against satellite rainfall over
-> northern Pakistan, and trained two models: one that predicts false alarms,
-> one that predicts misses."
-
-> "On held-out data the underlying forecast catches 74% of extreme rainfall
-> events — but 57% of its warnings never verify."
-
-Scroll to the error-model table.
-
-> "Our false-alarm model has a Brier skill score of +0.29 over climatology,
-> ROC AUC 0.735. Ensemble disagreement really does predict which warnings
-> will fail."
-
-> "The miss model is more honest about its limits. It ranks above chance, but
-> adds almost nothing in skill — we report that as a negative result."
-
-**Do not skip:** point at the uncalibrated miss row.
-
-> "And look at this: uncalibrated, that model scored minus 4.86 — far worse
-> than guessing. Calibration moved it to plus 0.012. That's why calibration
-> is its own stage, not an afterthought."
+**On screen:** app → *Overview*, the opening headline.
 
 ---
 
-## 1:05 – 1:35 · Trust bands
+## 0:25 – 0:50 · How bad the warnings actually are
 
-Scroll to the trust-band table, or show `reports/figures/trust_bands.png`.
+**On screen:** stay on *Overview*, the three cards.
 
-> "Turning that into something usable: cells we label LOW trust fail 62% of
-> the time, against 25% for MEDIUM. That's a 2.5× separation, capturing 94%
-> of all false alarms."
+> "First, the baseline. Over northern Pakistan in our test month, the
+> ensemble forecast caught 39% of extreme rainfall days — but 96% of the
+> warnings it issued never verified. It gave about eleven warnings for every
+> real event."
 
-> "But notice the HIGH band is empty. We froze those cutoffs before we knew
-> the base error rate would be 57% — so no calibrated model ever lands below
-> 20%. We're reporting that as a finding rather than quietly re-tuning the
-> bands after seeing results."
-
-That last sentence is worth keeping. Judges notice when limitations are
-volunteered rather than extracted.
+> "We are not trying to beat that forecast. That's for weather centres. We're
+> trying to say, in advance, which of those eleven to act on."
 
 ---
 
-## 1:35 – 2:35 · The audit trail — the strongest part
+## 0:50 – 1:30 · What we found — and where it broke
 
-**On screen:** app → *Verify a record*.
+**On screen:** *Evaluation results*.
 
-> "Here's the accountability half. Every forecast and its trust label is
-> hashed and committed **before** the rain window opens."
+> "We trained two models: one that predicts false alarms, one that predicts
+> misses. Both score a single number — the probability this decision is
+> wrong."
 
-Pick any record. Point at the green VERIFIED banner and the checks list.
+> "Trained on the 2021 monsoon and tested on the peak of 2022 — a different
+> year, but the same kind of weather — the false-alarm model reaches a Brier
+> skill score of +0.29 over climatology, ROC AUC 0.735, on seven thousand
+> samples. Ensemble disagreement genuinely predicts which warnings fail."
 
-> "The app recomputes the SHA-256 from the published record and compares it
-> with the committed hash, then checks the commit came before the window
-> opened. All checks pass."
+> "And it was usable. Warnings it rated low trust were wrong 62% of the
+> time; medium trust, 25%. One band held 94% of all the false alarms."
 
-Open **"Try tampering with it"**. Change `p_wrong_bp` to something much
-lower — e.g. 6782 → 500.
+> "The miss model does not work. Plus 0.012 — essentially nothing. We report
+> that as a negative result rather than dropping it."
 
-> "Now suppose, after the floods, we wanted to claim we'd been more confident
-> than we were. Change the probability from 68% to 5%..."
+**Then the part that matters most:**
 
-Click re-verify. Let the red MISMATCH sit on screen for a beat.
+> "Then we tested on a month the model had never seen — June 2024. And it
+> broke. Discrimination survived: AUC 0.740, almost unchanged. But every
+> single sample landed in one trust band, so the output was useless in
+> practice."
 
-> "Caught immediately. The hash no longer matches what was committed. You
-> don't have to trust us — you can check."
+> "We know why, and it isn't the model. We define 'extreme' as the 95th
+> percentile across the whole season, and the season is dominated by its
+> wettest months. June is far drier, so that bar is set much too low for
+> June — the event rate was 1.25% against 5.33% in training. The measuring
+> stick is wrong, not the scoring."
 
-**Then be precise about the limits:**
-
-> "To be clear about what this proves: that this exact record existed,
-> unchanged, before the rain. Not that the forecast was good. And an
-> owner-controlled registry can't prove we didn't quietly omit a forecast —
-> only a public schedule and visible gaps reduce that."
+That diagnosis is worth the airtime. Judges notice a team that can tell the
+difference between a broken model and a broken definition.
 
 ---
 
-## 2:35 – 3:00 · Close
+## 1:30 – 2:20 · The audit trail — the strongest part
 
-**On screen:** terminal, `pytest -q` finishing, or the repo.
+**On screen:** *Verify a record*.
 
-> "163 Python tests plus 24 contract tests, including leakage checks
-> that multiply every test-year
-> observation by a thousand and assert the thresholds don't move."
+> "Here's the accountability half. Every forecast and its trust rating is
+> hashed and sealed before the rain window opens."
 
-> "The honest limitation: ECMWF's tape archive gave us 20 of 40 files in
-> eight days and nothing for the years we'd planned to test on, so our test
-> set is two months inside one exceptional season. The method is ready; the
-> data wasn't obtainable in time."
+Pick any record. Point at the green banner and the list of checks.
 
-> "Code, report and every decision we made — including the ones that went
-> wrong — are in the repo."
+> "The page recomputes the SHA-256 from the published record, compares it
+> with what was sealed, and confirms the seal came first. All checks pass."
+
+Open the tamper control. Change the wrongness probability sharply — e.g.
+8767 down to 500.
+
+> "Now suppose that after the flood we wanted to claim we'd been more
+> confident than we really were. Drop it from 88% to 5%…"
+
+Re-check. **Let the red failure sit on screen for a beat.**
+
+> "Caught instantly. You don't have to trust us. You can check."
+
+**Then be precise about the limits — do not skip this:**
+
+> "To be exact about what that proves: this record existed, unchanged,
+> before the rain. Not that the forecast was good. And an owner-controlled
+> registry can't prove we never quietly dropped an inconvenient forecast —
+> only a published schedule and visible gaps reduce that."
+
+---
+
+## 2:20 – 2:45 · Sealed in Bitcoin
+
+**On screen:** *Ledger status*, the fingerprint section.
+
+> "The 2022 records are a replay — the rain already fell, so no timestamp
+> made today could prove we spoke first, and the contract correctly refuses
+> to pretend otherwise."
+
+> "What we can prove is that these results haven't been edited since we
+> published them. All twenty-four records fold into one fingerprint, and
+> that fingerprint is written into the Bitcoin blockchain. Change any number
+> anywhere and it no longer matches."
+
+Show the block link.
+
+> "Bitcoin block 972,977, mined on the 24th of October. Anyone can check it
+> with the proof file in the repository — no account, no permission from us,
+> and nothing we can revoke."
+
+Confirmed on 2026-10-24 at 21:28 UTC, a day before the deadline, which is
+itself part of the claim: the results were fixed before submission.
+
+---
+
+## 2:45 – 3:00 · Close
+
+**On screen:** terminal with `pytest -q` and `npx hardhat test` finishing.
+
+> "209 Python tests and 33 contract tests, including leakage checks that
+> multiply every test-period observation by a thousand and assert the
+> thresholds don't move."
+
+> "The honest limitation: ECMWF's archive gave us 22 of 40 files in eight
+> days, and nothing for the years we'd planned to test on. Our test is one
+> month. The method is ready; the data wasn't obtainable in time."
+
+> "Code, report, and every decision — including the ones that went wrong —
+> are in the repo."
 
 ---
 
 ## Notes
 
-- **Lead with the tamper demo if you need to cut.** It is the single most
-  memorable thing here and it is exactly what the Climate Data &
-  Environmental Monitoring track asks for.
-- Do not claim a testnet deployment unless one has happened by recording
-  time. If it has, add ten seconds showing the contract address on a block
-  explorer and say the registry is live on Polygon Amoy.
-- Avoid the phrase "predicts floods". We predict *when a forecast is
-  unreliable*, which is a narrower and defensible claim.
+- **If you must cut, keep the tamper demo and the June-2024 failure.** The
+  first is the most memorable thing here; the second is what separates an
+  honest project from a demo.
+- **Do not claim a public deployment that hasn't happened.** If the contract
+  is live on a testnet by recording time, add ten seconds on the block
+  explorer showing the address. If it isn't, say the registry runs against a
+  local chain with the full test suite proving its rules — that is true and
+  defensible.
+- **Do not say the Bitcoin block "contains our data".** It holds a combined
+  fingerprint covering thousands of unrelated files; the proof file links
+  ours to it. Say "anchored in block N, verifiable with the included proof".
+- Avoid "predicts floods". We predict *when a forecast is unreliable* — a
+  narrower claim, and one we can actually defend.

@@ -480,8 +480,8 @@ python scripts/download_tigge.py --all --group precip   # slow: tape archive
 python scripts/build_labels.py
 python scripts/run_evaluation.py
 python scripts/build_records.py
-pytest -q                     # 163 Python tests
-npx hardhat test              # 24 contract tests
+pytest -q                     # 209 Python tests
+npx hardhat test              # 33 contract tests
 ```
 
 Every decision taken, including the ones that departed from the original

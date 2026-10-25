@@ -115,7 +115,7 @@ Isotonic calibration, fitted only on the calibration split, moved it to
 - **Audit:** canonical JSON with floats rejected outright (probabilities in
   basis points) so hashes reproduce across platforms.
 
-**163 Python tests and 24 Solidity contract tests**, including leakage
+**209 Python tests and 33 Solidity contract tests**, including leakage
 checks that multiply every test-year
 observation by 1000 and assert the thresholds come back bit-identical, and
 tamper tests that confirm altering any field breaks verification.
@@ -228,8 +228,8 @@ ECMWF Data Store API · Streamlit · Solidity · Hardhat
 ## Try it
 
 ```bash
-pytest -q                                   # 163 tests
-npx hardhat test                            # 24 contract tests
+pytest -q                                   # 209 tests
+npx hardhat test                            # 33 contract tests
 streamlit run src/app/streamlit_app.py      # verification page
 ```
 

@@ -1,0 +1,11 @@
+{
+  "block_height": 972977,
+  "chain": "bitcoin",
+  "explorer_url": "https://mempool.space/block/972977",
+  "file": "archive_manifest.json",
+  "file_sha256": "b9cd0cbccb436de692ec95fbb8b47c6dfedd55d8a9c3ae25aa98097b33a8fa27",
+  "note": "The block holds an aggregated Merkle root covering many unrelated timestamps, not this file's hash in readable form. The proof file supplies the path from one to the other; verification needs both.",
+  "proof_file": "archive_manifest.json.ots",
+  "status": "confirmed",
+  "verify_url": "https://opentimestamps.org"
+}
